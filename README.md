@@ -1,3 +1,12 @@
+# IERC8060Reservable
+
+Minimal reservation accounting extension for ERC-8060 value-bearing NFTs.
+
+The extension allows authorized spenders to reserve portions of a token's underlying value without taking custody of the NFT itself.
+
+Status: Draft
+Reference implementation and test suite included in this repository.
+
 ## Design Review Summary
 
 This extension was intentionally designed as a minimal reservation accounting primitive rather than a generalized escrow or obligation framework.
