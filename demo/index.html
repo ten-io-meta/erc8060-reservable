@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IERC8060Reservable Demo</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <p class="eyebrow">IERC8060Reservable</p>
+      <h1>Commit value without moving the asset.</h1>
+      <p class="subtitle">
+        A minimal reservation accounting primitive for ERC-8060 value-bearing NFTs.
+      </p>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <p class="label">Token</p>
+          <h2>ERC-8060 Treasury #1</h2>
+        </div>
+        <span class="status">Owner keeps custody</span>
+      </div>
+
+      <div class="values">
+        <div>
+          <p>Total Value</p>
+          <strong id="totalValue">1000 ETH</strong>
+        </div>
+        <div>
+          <p>Locked Value</p>
+          <strong id="lockedValue">600 ETH</strong>
+        </div>
+        <div>
+          <p>Available Value</p>
+          <strong id="availableValue">400 ETH</strong>
+        </div>
+      </div>
+
+      <div class="bar">
+        <div id="lockedBar"></div>
+      </div>
+
+      <h3>Reservations</h3>
+
+      <div class="reservations">
+        <div class="reservation">
+          <span>Lending collateral</span>
+          <strong id="lendingAmount">300 ETH</strong>
+        </div>
+
+        <div class="reservation">
+          <span>Agent task bond</span>
+          <strong id="bondAmount">200 ETH</strong>
+        </div>
+
+        <div class="reservation">
+          <span>Escrow commitment</span>
+          <strong id="escrowAmount">100 ETH</strong>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button onclick="reserveLending(50)">
+  +50 Lending
+</button>
+
+<button onclick="reserveBond(50)">
+  +50 Bond
+</button>
+
+<button onclick="reserveEscrow(50)">
+  +50 Escrow
+</button>
+      </div>
+    </section>
+
+    <section class="explain">
+      <p>
+        The NFT never leaves the owner. The value is not transferred to the
+        applications. Each application only reserves part of the token's
+        available value.
+      </p>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
