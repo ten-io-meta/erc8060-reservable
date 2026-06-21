@@ -22,7 +22,9 @@
           <p class="label">Token</p>
           <h2>ERC-8060 Treasury #1</h2>
         </div>
-        <span class="status">Owner keeps custody</span>
+        <span class="status" id="ownerLabel">
+  Owner: Alice
+</span>
       </div>
 
       <div class="values">
@@ -64,6 +66,12 @@
       </div>
 
    <div class="controls">
+
+  <button onclick="transferNFT()">
+    TRANSFER NFT
+  </button>
+
+</div>
   <button onclick="reserveLending(50)">+50 Lending</button>
   <button class="release" onclick="releaseLending(50)">-50 Lending</button>
 

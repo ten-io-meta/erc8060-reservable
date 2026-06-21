@@ -3,6 +3,7 @@ const total = 1000;
 let lending = 300;
 let bond = 200;
 let escrow = 100;
+let owner = "Alice";
 
 function currentLocked() {
   return lending + bond + escrow;
@@ -86,6 +87,21 @@ function refresh() {
   document.getElementById("lendingAmount").innerText = `${lending} ETH`;
   document.getElementById("bondAmount").innerText = `${bond} ETH`;
   document.getElementById("escrowAmount").innerText = `${escrow} ETH`;
+  document.getElementById("ownerLabel").innerText =
+  `Owner: ${owner}`;
 }
+function transferNFT() {
 
+  if (owner === "Alice") {
+    owner = "Bob";
+  } else {
+    owner = "Alice";
+  }
+
+  refresh();
+
+  alert(
+    "NFT ownership transferred. Reservations remained attached to the token."
+  );
+}
 window.addEventListener("load", refresh);
