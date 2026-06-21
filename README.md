@@ -112,12 +112,14 @@ Demonstrate that value can be committed to an agent task without transferring ow
 
 ## Design Validation
 
-The included examples demonstrate that reservation accounting is sufficient to support multiple application-layer workflows without modifying the standard itself.
+The included examples demonstrate that reservation accounting is sufficient to support multiple independent application-layer workflows without modifying the standard itself.
 
 Current examples validate:
 
 * Escrow workflows
 * Agent task commitments
+* Lending collateral commitments
+* Timed escrow recovery patterns
 
 while preserving the original architectural separation:
 
@@ -129,26 +131,146 @@ while preserving the original architectural separation:
 | Reputation Systems | Identity and trust              |
 | Risk Engines       | Interpretation and underwriting |
 
+The repository intentionally demonstrates that increasingly sophisticated workflows can emerge without expanding the reservation accounting surface itself.
+
+---
+
+## Example Applications
+
+### MinimalReservableEscrow
+
+Demonstrates escrow-style workflows without transferring NFT ownership or introducing settlement semantics into the reservation layer.
+
+Properties demonstrated:
+
+* Value reservation
+* Value release
+* No custody transfer
+* No NFT transfer
+* Transfer persistence
+* Allowance enforcement
+
+### AgentTaskBond
+
+Demonstrates agent coordination workflows using reservation accounting.
+
+Properties demonstrated:
+
+* Task bond creation
+* Multiple concurrent bonds
+* Reservation accumulation
+* Independent bond release
+* Independent bond settlement
+* Invalid state protection
+* Allowance enforcement
+* Available value enforcement
+
+### MinimalLendingCollateral
+
+Demonstrates lending-style collateral commitments using reservation accounting.
+
+Properties demonstrated:
+
+* Loan collateral locking
+* Independent coexistence with escrows and task bonds
+* Transfer persistence
+* Independent collateral release
+* Shared accounting across applications
+
+### TimedReservableEscrow
+
+Demonstrates application-layer recovery mechanisms without modifying IERC8060Reservable.
+
+Properties demonstrated:
+
+* Deadline-based expiration
+* Refund of abandoned reservations
+* Recovery from inactive counterparties
+* Anti-griefing application pattern
+
 ---
 
 ## Test Status
 
 Current test suite validates:
 
-* Reservation invariants
-* Double-spend prevention
-* Transfer persistence
-* Escrow integration
-* Agent bond integration
-* Adversarial state transitions
+### Core Reservation Accounting
 
-**Current repository status: 24 passing tests.**
+* Reservation creation
+* Reservation release
+* Available value accounting
+* Locked value accounting
+* Allowance enforcement
+* Double-spend prevention
+
+### Adversarial Scenarios
+
+* Exact exhaustion
+* Over-allocation prevention
+* Release order independence
+* Double release protection
+* Invalid state transitions
+* Concurrent application interactions
+
+### Transfer Persistence
+
+* Active reservations survive NFT transfers
+* Active obligations remain attached to the tokenId
+* New owners inherit reservation state
+* New owners can use remaining available value
+
+### Multi-Application Validation
+
+* Escrow coexistence
+* Agent bond coexistence
+* Lending coexistence
+* Independent release paths
+* Independent settlement paths
+
+### Multi-Asset Validation
+
+* Asset-level reservation isolation
+* Independent accounting per asset
+
+### Multi-Token Validation
+
+* Token-level reservation isolation
+* Independent accounting per tokenId
+
+### Timed Recovery Validation
+
+* Deadline-based refunds
+* Expired escrow recovery
+* Recovery without modifying IERC8060Reservable
+
+**Current repository status: 53+ passing tests.**
+
+---
+
+## Protocol Closure
+
+Multiple adversarial reviews, application-layer implementations, and test expansions have failed to identify any missing reservation-accounting primitive.
+
+The current repository demonstrates:
+
+* Reservation accounting without custody transfer
+* Reservation accounting without ownership transfer
+* Multiple concurrent commitments
+* Multi-application coexistence
+* Multi-asset isolation
+* Multi-token isolation
+* Transfer persistence
+* Recovery patterns implemented entirely at the application layer
+
+No additional accounting primitive has been required to support these behaviors.
+
+The design is therefore considered to have reached protocol closure for reservation accounting.
 
 ---
 
 ## Core Principle
 
-`IERC8060Reservable` remains a reservation accounting primitive.
+IERC8060Reservable remains a reservation accounting primitive.
 
 It does not define:
 
@@ -157,21 +279,12 @@ It does not define:
 * Reputation
 * Dispute resolution
 * Deadlines
+* Slashing
+* Governance
 * Business logic
 
 These concerns remain intentionally delegated to application-layer contracts.
 
----
+The purpose of the standard is not to execute commitments.
 
-## Practical Validation
-
-The included examples demonstrate that reservation accounting is sufficient to support real application-layer workflows without extending the standard itself.
-
-The repository currently shows that:
-
-* Value can be committed without transferring ownership.
-* Value can be reserved without transferring custody.
-* Multiple independent commitments can coexist on the same token.
-* Reservation accounting remains separate from execution and settlement logic.
-
-This supports the design goal that `IERC8060Reservable` should remain a minimal accounting primitive while allowing increasingly sophisticated application-layer systems to emerge on top of it.
+The purpose of the standard is to account for committed value.
