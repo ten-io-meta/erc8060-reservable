@@ -18,7 +18,10 @@ contract ERC8060ReservableMock is IERC8060Reservable {
     constructor() {
         _owners[1] = msg.sender;
     }
-
+function mintToken(uint256 tokenId, address to) external {
+    require(_owners[tokenId] == address(0), "already minted");
+    _owners[tokenId] = to;
+}
     modifier onlyOwner(uint256 tokenId) {
         require(_owners[tokenId] == msg.sender, "not owner");
         _;
