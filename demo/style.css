@@ -158,3 +158,6 @@ h3 {
     gap: 12px;
   }
 }
+.controls button.release {
+  background: #475569;
+}
