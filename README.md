@@ -6,7 +6,7 @@ The extension allows authorized spenders to reserve portions of a token's underl
 
 **Status:** Draft
 
-Reference implementation, test suite, and escrow example included in this repository.
+Reference implementation, test suite, escrow example, and agent bond example included in this repository.
 
 ---
 
@@ -85,28 +85,93 @@ Demonstrate that value can be committed without transferring ownership or custod
 * Settlement logic remains external
 * `IERC8060Reservable` remains purely an accounting primitive
 
-### Test Coverage
+---
 
-The example includes automated tests demonstrating:
+## Example: AgentTaskBond
 
-* Value reservation
-* Reservation release
-* Transfer persistence
+This repository includes a minimal agent coordination example built on top of `IERC8060Reservable`.
+
+The example demonstrates that task commitments can be implemented using reservation accounting without introducing execution, reputation, or settlement semantics into the standard itself.
+
+### Goal
+
+Demonstrate that value can be committed to an agent task without transferring ownership or custody.
+
+### Properties Demonstrated
+
+* Task bond creation
+* Multiple concurrent bonds
+* Reservation accumulation
+* Independent bond release
+* Independent bond settlement
+* Invalid state protection
 * Allowance enforcement
+* Available value enforcement
+
+---
+
+## Design Validation
+
+The included examples demonstrate that reservation accounting is sufficient to support multiple application-layer workflows without modifying the standard itself.
+
+Current examples validate:
+
+* Escrow workflows
+* Agent task commitments
+
+while preserving the original architectural separation:
+
+| Layer              | Responsibility                  |
+| ------------------ | ------------------------------- |
+| ERC-8060           | Value custody                   |
+| IERC8060Reservable | Reservation accounting          |
+| Applications       | Settlement and execution        |
+| Reputation Systems | Identity and trust              |
+| Risk Engines       | Interpretation and underwriting |
+
+---
+
+## Test Status
+
+Current test suite validates:
+
+* Reservation invariants
+* Double-spend prevention
+* Transfer persistence
 * Escrow integration
+* Agent bond integration
+* Adversarial state transitions
 
-### Design Principle
+**Current repository status: 24 passing tests.**
 
-`IERC8060Reservable` standardizes reservation accounting only.
+---
 
-Settlement, liquidation, dispute resolution, deadlines, reputation systems, and business logic remain application-layer concerns.
+## Core Principle
+
+`IERC8060Reservable` remains a reservation accounting primitive.
+
+It does not define:
+
+* Settlement
+* Liquidation
+* Reputation
+* Dispute resolution
+* Deadlines
+* Business logic
+
+These concerns remain intentionally delegated to application-layer contracts.
 
 ---
 
 ## Practical Validation
 
-The included `MinimalReservableEscrow` example demonstrates that reservation accounting is sufficient to support escrow-style workflows without modifying the standard.
+The included examples demonstrate that reservation accounting is sufficient to support real application-layer workflows without extending the standard itself.
 
-This supports the design goal that `IERC8060Reservable` should remain a minimal accounting primitive while allowing execution, settlement, and business logic to emerge at the application layer.
+The repository currently shows that:
 
-The example validates that value can be committed without transferring ownership, custody, or introducing application-specific semantics into the accounting layer.
+* Value can be committed without transferring ownership.
+* Value can be reserved without transferring custody.
+* Multiple independent commitments can coexist on the same token.
+* Reservation accounting remains separate from execution and settlement logic.
+
+This supports the design goal that `IERC8060Reservable` should remain a minimal accounting primitive while allowing increasingly sophisticated application-layer systems to emerge on top of it.
