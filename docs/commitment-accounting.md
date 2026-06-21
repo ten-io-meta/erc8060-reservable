@@ -53,7 +53,8 @@ releaseValue(...)
 reserveAllowance(...)
 lockedValue(...)
 availableValue(...)
-```The extension only tracks commitment accounting.
+```
+The extension only tracks commitment accounting.
 
 It does not define:
 
