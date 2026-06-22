@@ -128,6 +128,60 @@ describe("ERC8060ReservableMock", function () {
       eth("110").toString()
     );
   });
+  it("prevents cross-token reserve allowance leakage", async function () {
+  const TOKEN_ID_2 = 2;
+
+  await mock.mintToken(TOKEN_ID_2, owner.address);
+  await mock.mintValue(TOKEN_ID_2, ETH, eth("100"));
+
+  await mock.approveReserve(TOKEN_ID, escrowA.address, ETH, eth("50"));
+
+  await expectRevert(
+    mock.connect(escrowA).reserveValue(TOKEN_ID_2, ETH, eth("10"))
+  );
+
+  expect((await mock.lockedValue(TOKEN_ID, ETH)).toString()).to.equal("0");
+  expect((await mock.lockedValue(TOKEN_ID_2, ETH)).toString()).to.equal("0");
+});
+
+it("prevents spender from releasing more than its own locked allocation", async function () {
+  await mock.approveReserve(TOKEN_ID, escrowA.address, ETH, eth("40"));
+  await mock.approveReserve(TOKEN_ID, escrowB.address, ETH, eth("40"));
+
+  await mock.connect(escrowA).reserveValue(TOKEN_ID, ETH, eth("40"));
+  await mock.connect(escrowB).reserveValue(TOKEN_ID, ETH, eth("40"));
+
+  await expectRevert(
+    mock.connect(escrowA).releaseValue(TOKEN_ID, ETH, eth("50"))
+  );
+
+  expect((await mock.lockedValue(TOKEN_ID, ETH)).toString()).to.equal(
+    eth("80").toString()
+  );
+
+  expect((await mock.availableValue(TOKEN_ID, ETH)).toString()).to.equal(
+    eth("20").toString()
+  );
+});
+
+it("does not leak dust after repeated 1 wei reserve and release cycles", async function () {
+  await mock.approveReserve(TOKEN_ID, escrowA.address, ETH, eth("1"));
+
+  for (let i = 0; i < 1000; i++) {
+    await mock.connect(escrowA).reserveValue(TOKEN_ID, ETH, 1);
+    await mock.connect(escrowA).releaseValue(TOKEN_ID, ETH, 1);
+  }
+
+  expect((await mock.lockedValue(TOKEN_ID, ETH)).toString()).to.equal("0");
+
+  expect((await mock.availableValue(TOKEN_ID, ETH)).toString()).to.equal(
+    eth("100").toString()
+  );
+
+  await expectRevert(
+    mock.connect(escrowA).releaseValue(TOKEN_ID, ETH, 1)
+  );
+});
 
   it("releases locked value back to available value", async function () {
     await mock.approveReserve(TOKEN_ID, escrowA.address, ETH, eth("60"));

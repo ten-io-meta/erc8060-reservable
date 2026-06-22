@@ -40,10 +40,13 @@ function mintToken(uint256 tokenId, address to) external {
     }
 
     function transferFrom(address from, address to, uint256 tokenId) external {
-        require(_owners[tokenId] == from, "wrong owner");
-        require(msg.sender == from, "not authorized");
-        _owners[tokenId] = to;
-    }
+    require(_owners[tokenId] == from, "wrong owner");
+    require(msg.sender == from, "not authorized");
+
+    _clearUnusedReserveAllowances(tokenId);
+
+    _owners[tokenId] = to;
+}
 
     function withdraw(uint256 tokenId, address asset, uint256 amount) external onlyOwner(tokenId) {
         require(amount <= availableValue(tokenId, asset), "insufficient available value");
@@ -118,4 +121,10 @@ function mintToken(uint256 tokenId, address to) external {
     ) public view returns (uint256) {
         return _totalValue[tokenId][asset] - _lockedValue[tokenId][asset];
     }
+    function _clearUnusedReserveAllowances(uint256 tokenId) internal {
+    // Mock limitation:
+    // This reference mock does not maintain an enumerable spender list.
+    // Production implementations SHOULD clear or invalidate unused
+    // reserve allowance on transfer while preserving active locked value.
+}
 }
