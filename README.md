@@ -6,7 +6,21 @@ The extension allows authorized spenders to reserve portions of a token's underl
 
 **Status:** Draft
 
-Reference implementation, test suite, escrow example, and agent bond example included in this repository.
+## Live Demo
+
+https://ten-io-meta.github.io/erc8060-reservable/demo/
+
+Interactive demonstration of:
+
+- reserveValue()
+- releaseValue()
+- transfer persistence
+- multi-application coexistence
+- availableValue vs lockedValue
+
+Current repository status: 52 passing tests.
+
+Reference implementation, test suite, escrow example, lending example, timed escrow example, and agent bond example included in this repository.
 
 ---
 
