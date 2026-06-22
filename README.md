@@ -243,7 +243,7 @@ Current test suite validates:
 * Expired escrow recovery
 * Recovery without modifying IERC8060Reservable
 
-**Current repository status: 53+ passing tests.**
+**Current repository status: 52 passing tests.**
 
 ---
 

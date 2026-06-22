@@ -654,7 +654,7 @@ it("keeps reservations isolated by tokenId", async function () {
   expect(taskBond.active).to.equal(true);
   expect(activeEscrow.active).to.equal(true);
 });
-it("preserves three active obligations after NFT transfer", async function () {
+it("preserves loan bond and escrow obligations after NFT transfer", async function () {
 
   await token.approveReserve(
     TOKEN_ID,
