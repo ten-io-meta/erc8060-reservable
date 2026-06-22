@@ -18,13 +18,15 @@ contract ERC8060ReservableMock is IERC8060Reservable {
     constructor() {
         _owners[1] = msg.sender;
     }
-function mintToken(uint256 tokenId, address to) external {
-    require(_owners[tokenId] == address(0), "already minted");
-    _owners[tokenId] = to;
-}
+
     modifier onlyOwner(uint256 tokenId) {
         require(_owners[tokenId] == msg.sender, "not owner");
         _;
+    }
+
+    function mintToken(uint256 tokenId, address to) external {
+        require(_owners[tokenId] == address(0), "already minted");
+        _owners[tokenId] = to;
     }
 
     function mintValue(uint256 tokenId, address asset, uint256 amount) external onlyOwner(tokenId) {
@@ -40,13 +42,13 @@ function mintToken(uint256 tokenId, address to) external {
     }
 
     function transferFrom(address from, address to, uint256 tokenId) external {
-    require(_owners[tokenId] == from, "wrong owner");
-    require(msg.sender == from, "not authorized");
+        require(_owners[tokenId] == from, "wrong owner");
+        require(msg.sender == from, "not authorized");
 
-    _clearUnusedReserveAllowances(tokenId);
+        _clearUnusedReserveAllowances(tokenId);
 
-    _owners[tokenId] = to;
-}
+        _owners[tokenId] = to;
+    }
 
     function withdraw(uint256 tokenId, address asset, uint256 amount) external onlyOwner(tokenId) {
         require(amount <= availableValue(tokenId, asset), "insufficient available value");
@@ -68,7 +70,8 @@ function mintToken(uint256 tokenId, address to) external {
         address asset,
         uint256 amount
     ) external {
-    require(amount > 0, "amount is zero");
+        require(amount > 0, "amount is zero");
+
         Reservation storage r = _reservations[tokenId][msg.sender][asset];
 
         require(amount <= reserveAllowance(tokenId, msg.sender, asset), "exceeds reserve allowance");
@@ -85,7 +88,8 @@ function mintToken(uint256 tokenId, address to) external {
         address asset,
         uint256 amount
     ) external {
-    require(amount > 0, "amount is zero");
+        require(amount > 0, "amount is zero");
+
         Reservation storage r = _reservations[tokenId][msg.sender][asset];
 
         require(amount <= r.locked, "release exceeds locked value");
@@ -123,10 +127,11 @@ function mintToken(uint256 tokenId, address to) external {
     ) public view returns (uint256) {
         return _totalValue[tokenId][asset] - _lockedValue[tokenId][asset];
     }
+
     function _clearUnusedReserveAllowances(uint256 tokenId) internal {
-    // Mock limitation:
-    // This reference mock does not maintain an enumerable spender list.
-    // Production implementations SHOULD clear or invalidate unused
-    // reserve allowance on transfer while preserving active locked value.
-}
+        // Mock limitation:
+        // This reference mock does not maintain an enumerable spender list.
+        // Production implementations SHOULD clear or invalidate unused
+        // reserve allowance on transfer while preserving active locked value.
+    }
 }
