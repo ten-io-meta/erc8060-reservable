@@ -40,12 +40,14 @@ describe("MinimalReservableEscrow", function () {
     );
 
     expect(await reservable.ownerOf(TOKEN_ID)).to.equal(owner.address);
-    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal(
-      ESCROW_AMOUNT.toString()
-    );
-    expect((await reservable.availableValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal(
-      ONE_ETH.sub(ESCROW_AMOUNT).toString()
-    );
+
+    expect(
+      (await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()
+    ).to.equal(ESCROW_AMOUNT.toString());
+
+    expect(
+      (await reservable.availableValue(TOKEN_ID, ETH_ASSET)).toString()
+    ).to.equal(ONE_ETH.sub(ESCROW_AMOUNT).toString());
   });
 
   it("releases escrow back to available value", async function () {
@@ -65,10 +67,13 @@ describe("MinimalReservableEscrow", function () {
 
     await escrow.releaseEscrow(0);
 
-    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal("0");
-    expect((await reservable.availableValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal(
-      ONE_ETH.toString()
-    );
+    expect(
+      (await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()
+    ).to.equal("0");
+
+    expect(
+      (await reservable.availableValue(TOKEN_ID, ETH_ASSET)).toString()
+    ).to.equal(ONE_ETH.toString());
   });
 
   it("cannot create escrow without reserve allowance", async function () {
@@ -84,6 +89,69 @@ describe("MinimalReservableEscrow", function () {
     } catch (error) {
       expect(error.message).to.include("exceeds reserve allowance");
     }
+  });
+
+  it("cannot release the same escrow twice", async function () {
+    await reservable.approveReserve(
+      TOKEN_ID,
+      escrow.address,
+      ETH_ASSET,
+      ESCROW_AMOUNT
+    );
+
+    await escrow.createEscrow(
+      TOKEN_ID,
+      ETH_ASSET,
+      ESCROW_AMOUNT,
+      seller.address
+    );
+
+    await escrow.releaseEscrow(0);
+
+    try {
+      await escrow.releaseEscrow(0);
+      expect.fail("Expected transaction to revert");
+    } catch (error) {
+      expect(error.message).to.include("Escrow not active");
+    }
+
+    expect(
+      (await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()
+    ).to.equal("0");
+
+    expect(
+      (await reservable.availableValue(TOKEN_ID, ETH_ASSET)).toString()
+    ).to.equal(ONE_ETH.toString());
+  });
+
+  it("cannot settle an escrow after release", async function () {
+    await reservable.approveReserve(
+      TOKEN_ID,
+      escrow.address,
+      ETH_ASSET,
+      ESCROW_AMOUNT
+    );
+
+    await escrow.createEscrow(
+      TOKEN_ID,
+      ETH_ASSET,
+      ESCROW_AMOUNT,
+      seller.address
+    );
+
+    await escrow.releaseEscrow(0);
+
+    try {
+      await escrow.settleEscrow(0);
+      expect.fail("Expected transaction to revert");
+    } catch (error) {
+      expect(error.message).to.include("Escrow not active");
+    }
+
+    const escrowInfo = await escrow.escrows(0);
+
+    expect(escrowInfo.active).to.equal(false);
+    expect(escrowInfo.settled).to.equal(false);
   });
 
   it("settles escrow without releasing reserved accounting", async function () {
@@ -103,8 +171,8 @@ describe("MinimalReservableEscrow", function () {
 
     await escrow.settleEscrow(0);
 
-    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal(
-      ESCROW_AMOUNT.toString()
-    );
+    expect(
+      (await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()
+    ).to.equal(ESCROW_AMOUNT.toString());
   });
 });
