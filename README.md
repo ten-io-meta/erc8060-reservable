@@ -257,7 +257,7 @@ Current test suite validates:
 * Expired escrow recovery
 * Recovery without modifying IERC8060Reservable
 
-**Current repository status: 52 passing tests.**
+**Current repository status: 61 passing tests.**
 
 ---
 
@@ -308,6 +308,64 @@ Displaying only `totalValue` may misrepresent the economically usable value of a
 
 Users and applications SHOULD evaluate both available and locked value when assessing token liquidity, collateralization, or market value.
 
+## Production Considerations
+
+IERC8060Reservable intentionally provides reservation accounting only.
+
+The standard does not define:
+
+* execution semantics,
+* liquidation logic,
+* escrow settlement,
+* recovery mechanisms,
+* marketplace behavior,
+* disclosure requirements.
+
+These concerns belong to application-layer implementations and optional profiles.
+
+### Recoverability
+
+Applications SHOULD explicitly declare whether reservations are:
+
+* Hard Reservations
+* Recoverable Reservations
+
+Hard reservations may result in permanently locked value if the reservation controller becomes unavailable.
+
+Production applications SHOULD carefully evaluate whether recovery mechanisms are appropriate for their use case.
+
+See:
+
+* Recoverable Applications Profile
+
+### Disclosure
+
+Wallets, marketplaces, agents, and indexers SHOULD display:
+
+* totalValue
+* lockedValue
+* availableValue
+
+Displaying only `totalValue` may misrepresent the economically usable value of a token with active reservations.
+
+Unknown reservation metadata SHOULD be treated as higher risk.
+
+See:
+
+* Disclosure and Indexing Profile
+
+### Protocol Closure
+
+Multiple hostile review rounds, adversarial testing, and independent analysis were unable to identify a transaction sequence capable of violating the documented accounting invariants.
+
+Remaining concerns were consistently classified as:
+
+* Integration Layer
+* Application Layer
+* Disclosure Layer
+* Recoverability Layer
+
+No missing mandatory accounting primitive was identified.
 
 ## Protocol Closure
 
