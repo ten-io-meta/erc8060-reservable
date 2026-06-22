@@ -30,6 +30,7 @@ describe("ERC8060ReservableMock", function () {
 
     const Mock = await ethers.getContractFactory("ERC8060ReservableMock");
     mock = await Mock.deploy();
+    await mock.deployed();
 
     await mock.mintValue(TOKEN_ID, ETH, eth("100"));
   });
@@ -71,8 +72,61 @@ describe("ERC8060ReservableMock", function () {
 
     await mock.approveReserve(TOKEN_ID, escrowA.address, ETH, 0);
 
-    expect((await mock.lockedValue(TOKEN_ID, ETH)).toString()).to.equal(eth("60").toString());
-    expect((await mock.availableValue(TOKEN_ID, ETH)).toString()).to.equal(eth("40").toString());
+    expect((await mock.lockedValue(TOKEN_ID, ETH)).toString()).to.equal(
+      eth("60").toString()
+    );
+
+    expect((await mock.availableValue(TOKEN_ID, ETH)).toString()).to.equal(
+      eth("40").toString()
+    );
+  });
+
+  it("cannot reserve zero value", async function () {
+    await mock.approveReserve(TOKEN_ID, escrowA.address, ETH, eth("1"));
+
+    await expectRevert(
+      mock.connect(escrowA).reserveValue(TOKEN_ID, ETH, eth("0"))
+    );
+  });
+
+  it("cannot release zero value", async function () {
+    await mock.approveReserve(TOKEN_ID, escrowA.address, ETH, eth("1"));
+    await mock.connect(escrowA).reserveValue(TOKEN_ID, ETH, eth("1"));
+
+    await expectRevert(
+      mock.connect(escrowA).releaseValue(TOKEN_ID, ETH, eth("0"))
+    );
+  });
+
+  it("handles max uint256 reserve allowance safely", async function () {
+    const max = ethers.constants.MaxUint256;
+
+    await mock.approveReserve(TOKEN_ID, escrowA.address, ETH, max);
+
+    expect(
+      (await mock.reserveAllowance(TOKEN_ID, escrowA.address, ETH)).toString()
+    ).to.equal(max.toString());
+
+    await mock.connect(escrowA).reserveValue(TOKEN_ID, ETH, eth("1"));
+
+    expect(
+      (await mock.reserveAllowance(TOKEN_ID, escrowA.address, ETH)).toString()
+    ).to.equal(max.sub(eth("1")).toString());
+  });
+
+  it("underlying value inflation increases available value without changing locked value", async function () {
+    await mock.approveReserve(TOKEN_ID, escrowA.address, ETH, eth("40"));
+    await mock.connect(escrowA).reserveValue(TOKEN_ID, ETH, eth("40"));
+
+    await mock.mintValue(TOKEN_ID, ETH, eth("50"));
+
+    expect((await mock.lockedValue(TOKEN_ID, ETH)).toString()).to.equal(
+      eth("40").toString()
+    );
+
+    expect((await mock.availableValue(TOKEN_ID, ETH)).toString()).to.equal(
+      eth("110").toString()
+    );
   });
 
   it("releases locked value back to available value", async function () {
@@ -81,7 +135,12 @@ describe("ERC8060ReservableMock", function () {
 
     await mock.connect(escrowA).releaseValue(TOKEN_ID, ETH, eth("20"));
 
-    expect((await mock.lockedValue(TOKEN_ID, ETH)).toString()).to.equal(eth("40").toString());
-    expect((await mock.availableValue(TOKEN_ID, ETH)).toString()).to.equal(eth("60").toString());
+    expect((await mock.lockedValue(TOKEN_ID, ETH)).toString()).to.equal(
+      eth("40").toString()
+    );
+
+    expect((await mock.availableValue(TOKEN_ID, ETH)).toString()).to.equal(
+      eth("60").toString()
+    );
   });
 });

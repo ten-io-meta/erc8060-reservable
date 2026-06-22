@@ -64,7 +64,7 @@ function mintToken(uint256 tokenId, address to) external {
         uint256 tokenId,
         address asset,
         uint256 amount
-    ) external {
+    ) external { require(amount > 0, "amount is zero");
         Reservation storage r = _reservations[tokenId][msg.sender][asset];
 
         require(amount <= reserveAllowance(tokenId, msg.sender, asset), "exceeds reserve allowance");
@@ -80,7 +80,7 @@ function mintToken(uint256 tokenId, address to) external {
         uint256 tokenId,
         address asset,
         uint256 amount
-    ) external {
+    ) external { require(amount > 0, "amount is zero");
         Reservation storage r = _reservations[tokenId][msg.sender][asset];
 
         require(amount <= r.locked, "release exceeds locked value");
