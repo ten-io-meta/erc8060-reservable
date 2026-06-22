@@ -18,7 +18,7 @@ Interactive demonstration of:
 - multi-application coexistence
 - availableValue vs lockedValue
 
-Current repository status: 52 passing tests.
+Current repository status: 61 passing tests.
 
 Reference implementation, test suite, escrow example, lending example, timed escrow example, and agent bond example included in this repository.
 
@@ -260,6 +260,54 @@ Current test suite validates:
 **Current repository status: 52 passing tests.**
 
 ---
+
+## Security Considerations
+
+### Dead Reservations
+
+If an authorized application reserves value and later becomes inaccessible, the reserved value may remain locked indefinitely.
+
+Examples include:
+
+* abandoned escrow contracts
+* lost administrative keys
+* broken upgrades
+* permanently paused applications
+* governance failures
+
+IERC8060Reservable deliberately does not define a universal force-release mechanism.
+
+A universal force-release would weaken reservation credibility for applications such as:
+
+* lending collateral
+* escrows
+* agent task bonds
+* conditional commitments
+
+Instead, recovery mechanisms are intentionally delegated to application-layer contracts.
+
+Applications SHOULD implement explicit recovery paths where appropriate, including:
+
+* deadline-based refunds
+* arbitration-controlled releases
+* governance-controlled recovery
+* bonded application designs
+* upgrade safety constraints
+
+The included `TimedReservableEscrow` example demonstrates one such recovery pattern.
+
+### Secondary Market Disclosure
+
+Applications, wallets, and marketplaces SHOULD display:
+
+* totalValue
+* lockedValue
+* availableValue
+
+Displaying only `totalValue` may misrepresent the economically usable value of a token with active reservations.
+
+Users and applications SHOULD evaluate both available and locked value when assessing token liquidity, collateralization, or market value.
+
 
 ## Protocol Closure
 

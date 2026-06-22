@@ -145,3 +145,4 @@ The remaining concerns identified during review were classified as:
 * integration requirements for ERC-8060 implementations
 
 No additional accounting primitive has been demonstrated as necessary.
+Final hostile review rounds did not identify any transaction sequence capable of violating the documented accounting invariants. Remaining concerns were classified as integration-layer, application-layer, disclosure-layer, or recoverability-layer risks.
