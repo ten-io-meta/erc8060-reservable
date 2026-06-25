@@ -1,5 +1,5 @@
 # IERC8060Reservable
-
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20850524.svg)](https://doi.org/10.5281/zenodo.20850524)
 Minimal reservation accounting extension for ERC-8060 value-bearing NFTs.
 
 The extension allows authorized spenders to reserve portions of a token's underlying value without taking custody of the NFT itself.
