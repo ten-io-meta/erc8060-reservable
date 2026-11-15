@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: MIT
+
+ // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "./IERC8060Reservable.sol";
@@ -8,12 +9,17 @@ contract ERC8060ReservableMock is IERC8060Reservable {
     mapping(uint256 => mapping(address => uint256)) private _totalValue;
     mapping(uint256 => mapping(address => uint256)) private _lockedValue;
 
+    // Approval version for each NFT.
+    mapping(uint256 => uint256) private _approvalEpoch;
+
     struct Reservation {
         uint256 approved;
         uint256 locked;
+        uint256 epoch;
     }
 
-    mapping(uint256 => mapping(address => mapping(address => Reservation))) private _reservations;
+    mapping(uint256 => mapping(address => mapping(address => Reservation)))
+        private _reservations;
 
     constructor() {
         _owners[1] = msg.sender;
@@ -29,11 +35,18 @@ contract ERC8060ReservableMock is IERC8060Reservable {
         _owners[tokenId] = to;
     }
 
-    function mintValue(uint256 tokenId, address asset, uint256 amount) external onlyOwner(tokenId) {
+    function mintValue(
+        uint256 tokenId,
+        address asset,
+        uint256 amount
+    ) external onlyOwner(tokenId) {
         _totalValue[tokenId][asset] += amount;
     }
 
-    function totalValue(uint256 tokenId, address asset) external view returns (uint256) {
+    function totalValue(
+        uint256 tokenId,
+        address asset
+    ) external view returns (uint256) {
         return _totalValue[tokenId][asset];
     }
 
@@ -41,7 +54,11 @@ contract ERC8060ReservableMock is IERC8060Reservable {
         return _owners[tokenId];
     }
 
-    function transferFrom(address from, address to, uint256 tokenId) external {
+    function transferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) external {
         require(_owners[tokenId] == from, "wrong owner");
         require(msg.sender == from, "not authorized");
 
@@ -50,8 +67,16 @@ contract ERC8060ReservableMock is IERC8060Reservable {
         _owners[tokenId] = to;
     }
 
-    function withdraw(uint256 tokenId, address asset, uint256 amount) external onlyOwner(tokenId) {
-        require(amount <= availableValue(tokenId, asset), "insufficient available value");
+    function withdraw(
+        uint256 tokenId,
+        address asset,
+        uint256 amount
+    ) external onlyOwner(tokenId) {
+        require(
+            amount <= availableValue(tokenId, asset),
+            "insufficient available value"
+        );
+
         _totalValue[tokenId][asset] -= amount;
     }
 
@@ -61,7 +86,13 @@ contract ERC8060ReservableMock is IERC8060Reservable {
         address asset,
         uint256 amount
     ) external onlyOwner(tokenId) {
-        _reservations[tokenId][spender][asset].approved = amount;
+        Reservation storage r =
+            _reservations[tokenId][spender][asset];
+
+        r.approved = amount;
+        r.epoch = _approvalEpoch[tokenId];
+
+        // Existing locked funds remain untouched.
         emit ReserveApproval(tokenId, spender, asset, amount);
     }
 
@@ -72,10 +103,18 @@ contract ERC8060ReservableMock is IERC8060Reservable {
     ) external {
         require(amount > 0, "amount is zero");
 
-        Reservation storage r = _reservations[tokenId][msg.sender][asset];
+        Reservation storage r =
+            _reservations[tokenId][msg.sender][asset];
 
-        require(amount <= reserveAllowance(tokenId, msg.sender, asset), "exceeds reserve allowance");
-        require(amount <= availableValue(tokenId, asset), "insufficient available value");
+        require(
+            amount <= reserveAllowance(tokenId, msg.sender, asset),
+            "exceeds reserve allowance"
+        );
+
+        require(
+            amount <= availableValue(tokenId, asset),
+            "insufficient available value"
+        );
 
         r.locked += amount;
         _lockedValue[tokenId][asset] += amount;
@@ -90,9 +129,13 @@ contract ERC8060ReservableMock is IERC8060Reservable {
     ) external {
         require(amount > 0, "amount is zero");
 
-        Reservation storage r = _reservations[tokenId][msg.sender][asset];
+        Reservation storage r =
+            _reservations[tokenId][msg.sender][asset];
 
-        require(amount <= r.locked, "release exceeds locked value");
+        require(
+            amount <= r.locked,
+            "release exceeds locked value"
+        );
 
         r.locked -= amount;
         _lockedValue[tokenId][asset] -= amount;
@@ -105,7 +148,13 @@ contract ERC8060ReservableMock is IERC8060Reservable {
         address spender,
         address asset
     ) public view returns (uint256) {
-        Reservation memory r = _reservations[tokenId][spender][asset];
+        Reservation storage r =
+            _reservations[tokenId][spender][asset];
+
+        // A transfer invalidates permissions from earlier epochs.
+        if (r.epoch != _approvalEpoch[tokenId]) {
+            return 0;
+        }
 
         if (r.approved <= r.locked) {
             return 0;
@@ -125,13 +174,14 @@ contract ERC8060ReservableMock is IERC8060Reservable {
         uint256 tokenId,
         address asset
     ) public view returns (uint256) {
-        return _totalValue[tokenId][asset] - _lockedValue[tokenId][asset];
+        return _totalValue[tokenId][asset]
+            - _lockedValue[tokenId][asset];
     }
 
-    function _clearUnusedReserveAllowances(uint256 tokenId) internal {
-        // Mock limitation:
-        // This reference mock does not maintain an enumerable spender list.
-        // Production implementations SHOULD clear or invalidate unused
-        // reserve allowance on transfer while preserving active locked value.
+    function _clearUnusedReserveAllowances(
+        uint256 tokenId
+    ) internal {
+        // Invalidate old approvals without touching active locks.
+        _approvalEpoch[tokenId] += 1;
     }
 }

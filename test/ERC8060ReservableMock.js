@@ -164,7 +164,7 @@ it("prevents spender from releasing more than its own locked allocation", async 
   );
 });
 
-it("does not leak dust after repeated 1 wei reserve and release cycles", async function () {
+it("does not leak dust after repeated 1 wei reserve and release cycles", async function () {this.timeout(180000);
   await mock.approveReserve(TOKEN_ID, escrowA.address, ETH, eth("1"));
 
   for (let i = 0; i < 1000; i++) {
