@@ -50,12 +50,12 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     await escrow.connect(lender).fund(1, TERMS, { value: ETH("1") });
   }
   async function defaultNow() {
-    const l = await escrow.loans(1);
+    const l = await escrow.loanInfo(1);
     await warpAt(l.dueAt.toNumber() + l.grace.toNumber() + 1);
     await escrow.connect(stranger).declareDefault(1);
   }
   async function afterChallenge() {
-    const l = await escrow.loans(1);
+    const l = await escrow.loanInfo(1);
     await warpAt(l.defaultAt.toNumber() + l.challenge.toNumber() + 1);
   }
 
@@ -70,7 +70,7 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     await fund();
     const after = await ethers.provider.getBalance(borrower.address);
     eq(after.sub(before), ETH("1")); // borrower receives principal atomically
-    expect((await escrow.loans(1)).state).to.equal(2); // Active
+    expect((await escrow.loanInfo(1)).state).to.equal(2); // Active
     eq(await ethers.provider.getBalance(escrow.address), ethers.constants.Zero);
     await expectRevert(escrow.connect(borrower).cancelUnfunded(1, borrower.address), "not proposed");
     await expectRevert(escrow.connect(lender).fund(1, TERMS, { value:ETH("1") }), "not proposed");
@@ -143,7 +143,7 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
   it("silent arbitrator cannot create an indefinite lock; pre-agreed onchain fallback executes", async function () {
     await propose(); await fund(); await defaultNow();
     await escrow.connect(borrower).dispute(1);
-    const l = await escrow.loans(1);
+    const l = await escrow.loanInfo(1);
     await warpAt(l.defaultAt.toNumber() + l.challenge.toNumber() + l.arbitrateFor.toNumber() + 1);
     await expectRevert(escrow.connect(arbiter).arbitrate(1,true), "arbitration expired");
     await escrow.connect(stranger).liquidate(1);
@@ -182,7 +182,7 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
 
   it("borrower can repay at deadline+grace boundary but cannot after; dispute window boundary is enforced", async function () {
     await propose(); await fund();
-    let l=await escrow.loans(1);
+    let l=await escrow.loanInfo(1);
     await network.provider.send("evm_setNextBlockTimestamp", [l.dueAt.toNumber()+l.grace.toNumber()]);
     await escrow.connect(borrower).repay(1,{ value: ETH("0.1") });
     await defaultNow();
