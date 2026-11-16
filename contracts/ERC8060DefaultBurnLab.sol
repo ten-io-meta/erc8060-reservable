@@ -9,6 +9,20 @@ import "./ERC8060DefaultSaleLab.sol";
 contract ERC8060DefaultBurnLab is ERC8060DefaultSaleLab {
     uint256 public constant BURN_GRACE_PERIOD = 1 days;
 
+    /// @notice Distinct opt-in to the irreversible burn fallback before loan funding.
+    mapping(uint256 => bool) public burnFallbackAuthorized;
+
+    event BurnFallbackAuthorized(uint256 indexed loanId, address indexed borrower);
+
+    function authorizeBurnFallback(uint256 id) external {
+        Loan storage l = loans[id];
+        require(l.status == Status.Unfunded, "authorization before funding only");
+        require(msg.sender == l.borrower, "not borrower");
+        require(!burnFallbackAuthorized[id], "already authorized");
+        burnFallbackAuthorized[id] = true;
+        emit BurnFallbackAuthorized(id, msg.sender);
+    }
+
     event DefaultBurned(
         uint256 indexed loanId,
         uint256 recovered,
@@ -28,6 +42,7 @@ contract ERC8060DefaultBurnLab is ERC8060DefaultSaleLab {
         Loan storage l = loans[id];
 
         require(l.status == Status.Funded, "not funded");
+        require(burnFallbackAuthorized[id], "burn fallback not authorized");
         require(
             block.timestamp >
                 uint256(l.repayDeadline) + BURN_GRACE_PERIOD,
