@@ -184,7 +184,7 @@ describe("Dutch auction: adversarial regression / experimental only", function (
     const fake = await M.deploy(); await fake.deployed();
     await (await fake.mint()).wait();
     expect((await ethers.provider.getBalance(fake.address)).isZero()).to.equal(true);
-    expect((await fake.valueOf(1)).toString()).to.equal(eth("2").toString());
+    expect((await fake['valueOf(uint256)'](1)).toString()).to.equal(eth("2").toString());
     await expectRejectedCollection(fake.address);
   });
 
@@ -195,7 +195,7 @@ describe("Dutch auction: adversarial regression / experimental only", function (
     await (await fake.mint()).wait();
     await (await attacker.sendTransaction({to: fake.address, value: eth("2")})).wait();
     expect((await ethers.provider.getBalance(fake.address)).toString()).to.equal(eth("2").toString());
-    expect((await fake.valueOf(1)).toString()).to.equal(eth("2").toString());
+    expect((await fake['valueOf(uint256)'](1)).toString()).to.equal(eth("2").toString());
     await expectRejectedCollection(fake.address);
   });
 });
