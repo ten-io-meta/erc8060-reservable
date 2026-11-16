@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./reference/IERC721ValueReference.sol";
+import "./reference/ERC8060NativeETHReference.sol";
 
 /// @title CustodiedCollateralLoanPoC
 /// @notice EXPERIMENTAL fixed-ETH loan against an NFT whose native-ETH redemption
@@ -107,10 +108,31 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
                   uint256 lenderAward, uint256 borrowerSurplus, uint256 buyerRefund);
     event UnsoldNFTBurned(uint256 indexed loanId, uint256 redeemed);
 
+    /// @dev This experimental lending reference accepts ONLY the exact,
+    ///      non-upgradeable strict ETH-backed reference implementation.
+    ///      ABI/ ERC165 claims and a reported valueOf() are never adequate.
+    ///      The deploying party must ALSO verify collection provenance:
+    ///      identical runtime bytecode alone cannot prove constructor state.
     constructor(address nft_) {
         require(nft_ != address(0) && nft_.code.length != 0, "invalid NFT");
+        require(nft_.codehash == keccak256(type(ERC8060NativeETHReference).runtimeCode),
+                "untrusted NFT bytecode");
         nft = IERC721(nft_);
         valueNft = IERC721ValueReference(nft_);
+        require(ERC8060NativeETHReference(nft_).isSolvent(), "NFT reserve insolvent");
+    }
+
+    /// @dev Defensive reserve checks, on top of fixed implementation identity.
+    ///      Funds elsewhere in the collection cannot alone prove per-token rights;
+    ///      a canonical, correctly initialized collection is still required.
+    function _verifiedBacking(uint256 tokenId) private view returns (uint256 backing) {
+        ERC8060NativeETHReference strict = ERC8060NativeETHReference(address(nft));
+        require(strict.isSolvent(), "NFT reserve insolvent");
+        backing = strict.valueOf(tokenId);
+        require(backing != 0 && backing <= address(nft).balance,
+                "unfunded NFT value");
+        require(backing <= strict.totalRedeemableValue(),
+                "inconsistent NFT liabilities");
     }
 
     /// @notice Borrower commits the NFT and precise financial terms before
@@ -132,7 +154,7 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
         require(o.challenge > 0 && o.challenge <= MAX_CHALLENGE, "invalid challenge");
         require(o.arbitrateFor > 0 && o.arbitrateFor <= MAX_ARBITER_WINDOW,
                 "invalid arbitration period");
-        uint256 floor = valueNft.valueOf(o.tokenId);
+        uint256 floor = _verifiedBacking(o.tokenId);
         require(floor >= o.payoff, "insufficient ETH backing");
         require(o.saleStartPrice >= floor, "sale price below ETH floor");
         require(o.saleDuration >= MIN_SALE_DURATION && o.saleDuration <= MAX_SALE_DURATION,
@@ -179,7 +201,7 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
         require(block.timestamp <= l.fundingDeadline, "funding expired");
         require(msg.value == l.principal, "wrong principal");
         require(nft.ownerOf(l.tokenId) == address(this), "collateral missing");
-        require(valueNft.valueOf(l.tokenId) == l.redemptionFloor,
+        require(_verifiedBacking(l.tokenId) == l.redemptionFloor,
                 "ETH backing changed");
 
         l.state = State.Active;
@@ -336,7 +358,7 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
     ///      is verified again before launch. No actor can repricing afterwards.
     function _startSale(uint256 id, Loan storage l) private {
         require(nft.ownerOf(l.tokenId) == address(this), "collateral missing");
-        require(valueNft.valueOf(l.tokenId) == l.redemptionFloor, "ETH backing changed");
+        require(_verifiedBacking(l.tokenId) == l.redemptionFloor, "ETH backing changed");
         l.state = State.SaleOpen;
         l.saleStartedAt = uint64(block.timestamp);
         emit SaleOpened(id, l.saleStartPrice, l.redemptionFloor,
@@ -371,7 +393,7 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
         uint256 price = currentSalePrice(id);
         require(price <= maxPrice, "price above maximum");
         require(msg.value == maxPrice, "wrong bid amount");
-        require(valueNft.valueOf(l.tokenId) == l.redemptionFloor, "ETH backing changed");
+        require(_verifiedBacking(l.tokenId) == l.redemptionFloor, "ETH backing changed");
         require(nft.ownerOf(l.tokenId) == address(this), "collateral missing");
 
         uint256 owed = l.payoff - l.repaid;
@@ -405,7 +427,7 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
     }
 
     function _burnAndCredit(uint256 id, Loan storage l) private returns (uint256 received) {
-        uint256 expectedBacking = valueNft.valueOf(l.tokenId);
+        uint256 expectedBacking = _verifiedBacking(l.tokenId);
         uint256 owed = l.payoff - l.repaid;
         require(expectedBacking == l.redemptionFloor, "ETH backing changed");
         require(expectedBacking >= owed, "insufficient redeemable collateral");
