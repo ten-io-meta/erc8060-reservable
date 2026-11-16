@@ -21,12 +21,11 @@ async function mustRevert(action) {
 }
 
 describe("Dutch auction: adversarial regression / experimental only", function () {
-  async function setup(fake = false) {
+  async function setup() {
     const [borrower, lender, arbiter, buyerA, buyerB, outsider] = await ethers.getSigners();
-    const N = await ethers.getContractFactory(fake ? "AuctionFakeValueNFT" : "ERC8060NativeETHReference");
+    const N = await ethers.getContractFactory("ERC8060NativeETHReference");
     const nft = await N.deploy(); await nft.deployed();
-    if (fake) await (await nft.connect(borrower).mint()).wait();
-    else await (await nft.connect(borrower).mint({ value: eth("2") })).wait();
+    await (await nft.connect(borrower).mint({ value: eth("2") })).wait();
     const C = await ethers.getContractFactory("CustodiedCollateralLoanPoC");
     const loan = await C.deploy(nft.address); await loan.deployed();
     await (await nft.connect(borrower).approve(loan.address, 1)).wait();
@@ -168,25 +167,35 @@ describe("Dutch auction: adversarial regression / experimental only", function (
     await mustRevert(() => loan.burnUnsold(1));
   });
 
-  it("fake-value NFT is a documented trust boundary: sale accepts worthless collateral", async () => {
-    const { loan, nft, buyerA, lender } = await setup(true);
-    // The fake NFT advertises a 2 ETH floor without holding any ETH.
-    expect((await ethers.provider.getBalance(nft.address)).isZero()).to.equal(true);
-    await (await loan.connect(buyerA).buyCollateral(1, eth("3"), buyerA.address, { value: eth("3") })).wait();
-    expect((await loan.loanInfo(1)).state).to.equal(SOLD);
-    expect(await nft.ownerOf(1)).to.equal(buyerA.address);
-    expect((await loan.credits(lender.address)).toString()).to.equal((eth("1.2")).toString());
-    // This proves there is no independent backing verification at sale time.
-    // It is a known deployment trust assumption, NOT a security pass.
+  async function expectRejectedCollection(nftAddress) {
+    const C = await ethers.getContractFactory("CustodiedCollateralLoanPoC");
+    let error = "";
+    try {
+      const loan = await C.deploy(nftAddress);
+      await loan.deployed();
+    } catch (e) {
+      error = String(e);
+    }
+    expect(error).to.include("untrusted NFT bytecode");
+  }
+
+  it("rejects a zero-backed NFT that lies about its redeemable floor", async () => {
+    const M = await ethers.getContractFactory("AuctionFakeValueNFT");
+    const fake = await M.deploy(); await fake.deployed();
+    await (await fake.mint()).wait();
+    expect((await ethers.provider.getBalance(fake.address)).isZero()).to.equal(true);
+    expect((await fake.valueOf(1)).toString()).to.equal(eth("2").toString());
+    await expectRejectedCollection(fake.address);
   });
 
-  it("fake-value NFT cannot fake the ETH amount received from fallback burn", async () => {
-    const { loan, nft } = await setup(true);
-    const info = await loan.loanInfo(1);
-    await jump(info.saleStartedAt.toNumber() + info.saleDuration.toNumber() + 1);
-    await mustRevert(() => loan.burnUnsold(1));
-    expect((await loan.loanInfo(1)).state).to.equal(OPEN);
-    expect(await nft.ownerOf(1)).to.equal(loan.address);
-    expect((await loan.totalCredits()).toString()).to.equal((0).toString());
+  it("rejects fraudulent NFT code even when ETH is pre-funded at that address", async () => {
+    const [attacker] = await ethers.getSigners();
+    const M = await ethers.getContractFactory("AuctionFakeValueNFT");
+    const fake = await M.deploy(); await fake.deployed();
+    await (await fake.mint()).wait();
+    await (await attacker.sendTransaction({to: fake.address, value: eth("2")})).wait();
+    expect((await ethers.provider.getBalance(fake.address)).toString()).to.equal(eth("2").toString());
+    expect((await fake.valueOf(1)).toString()).to.equal(eth("2").toString());
+    await expectRejectedCollection(fake.address);
   });
 });
