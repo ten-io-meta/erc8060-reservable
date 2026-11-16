@@ -183,9 +183,11 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     eq(await escrow.credits(lender.address), ETH("1.1"));
     eq(await escrow.credits(borrower.address), ETH("0.9"));
   });
-  it("arbiter cannot take ETH or redirect proceeds; upholding default follows exact payoff split", async function () {
+  it("arbiter cannot steal ETH, bypass challenge window or redirect liquidation proceeds", async function () {
     await propose(); await fund(); await defaultNow();
     await escrow.connect(lender).dispute(1);
+    await expectRevert(escrow.connect(arbiter).arbitrate(1, false), "challenge open");
+    await afterChallenge();
     await escrow.connect(arbiter).arbitrate(1, false);
     eq(await escrow.credits(lender.address), ETH("1.1"));
     eq(await escrow.credits(borrower.address), ETH("0.9"));
