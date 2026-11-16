@@ -95,8 +95,8 @@ contract PartitionedReserveLoanPoC is IERC721Receiver, ReentrancyGuard {
     ///         unrelated reservations survive. After custody transfer invalidates
     ///         stale permissions, the loan approves and reserves its OWN portion.
     function propose(Offer calldata o) external nonReentrant returns (uint256 id) {
-        require(nft.ownerOf(o.tokenId) == msg.sender, "not NFT owner");
         require(activeTokenLoan[o.tokenId] == 0, "token already in loan");
+        require(nft.ownerOf(o.tokenId) == msg.sender, "not NFT owner");
         require(o.lender != address(0) && o.lender != msg.sender, "invalid lender");
         require(o.principal > 0 && o.payoff >= o.principal
                 && o.collateral >= o.payoff, "undersecured loan");
