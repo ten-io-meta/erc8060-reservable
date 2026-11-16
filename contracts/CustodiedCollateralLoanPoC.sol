@@ -89,7 +89,8 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
     event Repaid(uint256 indexed loanId, address indexed payer, uint256 amount, uint256 totalRepaid);
     event Defaulted(uint256 indexed loanId, uint64 defaultAt);
     event Disputed(uint256 indexed loanId, address indexed challenger);
-    event Arbitrated(uint256 indexed loanId, bool forgiveOutstanding);
+    event Arbitrated(uint256 indexed loanId, bool settledByPayment);
+    event LenderWaived(uint256 indexed loanId, address indexed lender, uint256 forgivenAmount);
     event Liquidated(uint256 indexed loanId, uint256 redeemed, uint256 lenderAward, uint256 borrowerSurplus);
     event NFTReleased(uint256 indexed loanId, address indexed receiver);
     event CreditWithdrawn(address indexed creditor, address indexed recipient, uint256 amount);
@@ -197,7 +198,7 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
         emit Repaid(id, msg.sender, msg.value, l.repaid);
     }
 
-    /// @notice Fully repaid or arbiter-forgiven obligations return the NFT to
+    /// @notice Fully repaid or lender-waived obligations return the NFT to
     ///         the authenticated borrower (or an explicit nominated recipient).
     function claimCollateral(uint256 id, address recipient) external nonReentrant {
         Loan storage l = _loans[id];
@@ -230,22 +231,63 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
         emit Disputed(id, msg.sender);
     }
 
-    /// @notice Trusted arbitrator may acknowledge offchain satisfaction.
-    ///         This power can forgive remaining debt and therefore MUST be
-    ///         explicitly accepted by both parties; otherwise use onchain-only
-    ///         lending with no external adjudication.
-    function arbitrate(uint256 id, bool forgiveOutstanding) external nonReentrant {
+    /// @notice Arbiter cannot forgive a lender's unpaid debt for free.
+    ///         If settlement is chosen, the caller must supply ALL outstanding
+    ///         ETH onchain; it is credited to the lender before NFT release.
+    ///         The other outcome upholds default and liquidates collateral.
+    /// @dev The named arbiter still has a *trusted* ability to accelerate
+    ///      liquidation during dispute. No claim of offchain payment is
+    ///      treated as proof. No admin can confiscate creditor credits.
+    function arbitrate(uint256 id, bool settleWithPayment)
+        external payable nonReentrant
+    {
         Loan storage l = _loans[id];
         require(l.state == State.Disputed, "not disputed");
         require(msg.sender == l.arbiter, "not arbiter");
         require(block.timestamp <= _resolutionDeadline(l), "arbitration expired");
-        if (forgiveOutstanding) {
-            l.state = State.Forgiven;
+        if (settleWithPayment) {
+            _settleOutstanding(id, l, msg.value);
             emit Arbitrated(id, true);
         } else {
+            require(msg.value == 0, "no ETH for liquidation");
             emit Arbitrated(id, false);
             _liquidate(id, l);
         }
+    }
+
+    /// @notice The lender, and ONLY the lender, may voluntarily waive unpaid
+    ///         debt (e.g. after independently verifying an offchain payment).
+    ///         This is an explicit creditor-controlled authorization.
+    /// @dev It cannot waive prior credited onchain repayments, which remain
+    ///      withdrawable by the lender. No third-party arbiter can forge it.
+    function lenderWaive(uint256 id) external nonReentrant {
+        Loan storage l = _loans[id];
+        require(l.state == State.Active || l.state == State.Defaulted
+                || l.state == State.Disputed, "not waivable");
+        require(msg.sender == l.lender, "not lender");
+        l.state = State.Forgiven;
+        emit LenderWaived(id, msg.sender, l.payoff - l.repaid);
+    }
+
+    /// @notice Anyone may cure default/dispute by paying the exact remaining
+    ///         onchain payoff BEFORE liquidation. The lender receives every wei.
+    /// @dev A competing valid liquidation tx can still win ordering; settlement
+    ///      and liquidation are mutually exclusive after either succeeds.
+    function settleAfterDefault(uint256 id) external payable nonReentrant {
+        Loan storage l = _loans[id];
+        require(l.state == State.Defaulted || l.state == State.Disputed,
+                "not awaiting resolution");
+        _settleOutstanding(id, l, msg.value);
+    }
+
+    function _settleOutstanding(uint256 id, Loan storage l, uint256 payment) private {
+        uint256 outstanding = l.payoff - l.repaid;
+        require(payment == outstanding && outstanding > 0, "exact payoff required");
+        l.repaid = l.payoff;
+        l.state = State.Repaid;
+        credits[l.lender] += payment;
+        totalCredits += payment;
+        emit Repaid(id, msg.sender, payment, l.repaid);
     }
 
     /// @notice Permissionless liquidation only after accepted challenge time,
