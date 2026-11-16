@@ -8,10 +8,28 @@ interface IStrictPayableReference {
     function burn(uint256 tokenId) external;
 }
 
-/// @notice Test-only receiver rejecting redemption, to check atomic rollback.
+interface IConditionalPayableReference {
+    function mint() external payable returns (uint256);
+    function withdrawAvailable(uint256 tokenId, uint256 amount) external;
+    function redeemWhenUnlocked(uint256 tokenId) external;
+}
+
+/// @notice Test-only receiver rejecting ETH, to check atomic rollback.
 contract RejectETHReceiverProbe is IERC721Receiver {
     function mintInto(address target) external payable {
         IStrictPayableReference(target).mint{value: msg.value}();
+    }
+
+    function mintConditionalInto(address target) external payable {
+        IConditionalPayableReference(target).mint{value: msg.value}();
+    }
+
+    function attemptConditionalWithdraw(address target, uint256 tokenId, uint256 amount) external {
+        IConditionalPayableReference(target).withdrawAvailable(tokenId, amount);
+    }
+
+    function attemptConditionalRedeem(address target, uint256 tokenId) external {
+        IConditionalPayableReference(target).redeemWhenUnlocked(tokenId);
     }
 
     function attemptBurn(address target, uint256 tokenId) external {
