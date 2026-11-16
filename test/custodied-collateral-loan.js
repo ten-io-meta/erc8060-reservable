@@ -37,7 +37,7 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
       principal: ETH("1"), payoff: ETH("1.1"),
       fundingDeadline: now + 1000,
       term: 200, grace: 100, challenge: 120, arbitrateFor: 120,
-      termsHash: TERMS
+      termsHash: TERMS, saleStartPrice: ETH("3"), saleDuration: 3600
     };
   });
 
@@ -57,6 +57,12 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
   async function afterChallenge() {
     const l = await escrow.loanInfo(1);
     await warpAt(l.defaultAt.toNumber() + l.challenge.toNumber() + 1);
+  }
+  async function expireAuctionAndBurn(id=1, alreadyOpen=false) {
+    if (!alreadyOpen) await escrow.startSale(id);
+    const l=await escrow.loanInfo(id);
+    await warpAt(l.saleStartedAt.toNumber()+l.saleDuration.toNumber()+1);
+    await escrow.burnUnsold(id);
   }
 
   it("never issues an unfunded debt or accepts wrong principal/terms/lender", async function () {
@@ -101,9 +107,10 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     await escrow.connect(borrower).repay(1, { value: ETH("0.3") });
     await defaultNow();
     await expectRevert(escrow.connect(borrower).repay(1,{value: ETH("0.8")}), "not active");
-    await expectRevert(escrow.connect(stranger).liquidate(1), "challenge open");
+    await expectRevert(escrow.connect(stranger).startSale(1), "challenge open");
     await afterChallenge();
-    await escrow.connect(stranger).liquidate(1);
+    await expectRevert(escrow.burnUnsold(1), "not sale open");
+    await expireAuctionAndBurn(1);
     await expectRevert(collateral.ownerOf(1), "invalid token ID");
     eq(await collateral.totalRedeemableValue(), ethers.constants.Zero);
     eq(await ethers.provider.getBalance(collateral.address), ethers.constants.Zero);
@@ -111,7 +118,7 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     eq(await escrow.credits(borrower.address), ETH("1.2"));
     eq(await escrow.totalCredits(), ETH("2.3"));
     eq(await ethers.provider.getBalance(escrow.address), ETH("2.3"));
-    await expectRevert(escrow.connect(stranger).liquidate(1), "not liquidatable");
+    await expectRevert(escrow.connect(stranger).startSale(1), "not saleable");
     await escrow.connect(lender).withdrawCredit(lender.address);
     await escrow.connect(borrower).withdrawCredit(borrower.address);
     eq(await escrow.totalCredits(), ethers.constants.Zero);
@@ -130,7 +137,7 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     await escrow.connect(arbiter).arbitrate(1,true, {value:ETH("1.1")});
     await escrow.connect(borrower).claimCollateral(1, borrower.address);
     expect(await collateral.ownerOf(1)).to.equal(borrower.address);
-    await expectRevert(escrow.connect(stranger).liquidate(1), "not liquidatable");
+    await expectRevert(escrow.connect(stranger).startSale(1), "not saleable");
     eq(await escrow.credits(lender.address), ETH("1.1")); // proof of actual payment
     eq(await ethers.provider.getBalance(escrow.address), ETH("1.1"));
     expect(await escrow.isCreditSolvent()).to.equal(true);
@@ -166,7 +173,7 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     eq(await escrow.totalCredits(), ETH("1.1"));
     expect(await escrow.isCreditSolvent()).to.equal(true);
     await expectRevert(escrow.connect(arbiter).arbitrate(1,false), "not disputed");
-    await expectRevert(escrow.connect(stranger).liquidate(1), "not liquidatable");
+    await expectRevert(escrow.connect(stranger).startSale(1), "not saleable");
     await escrow.connect(borrower).claimCollateral(1, borrower.address);
     expect(await collateral.ownerOf(1)).to.equal(borrower.address);
     await expectRevert(escrow.connect(stranger).settleAfterDefault(1,{value:ETH("0.8")}), "not awaiting resolution");
@@ -177,7 +184,7 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     await expectRevert(escrow.connect(lender).lenderWaive(1), "not waivable");
     await expectRevert(escrow.connect(stranger).settleAfterDefault(1,{value:ETH("1.1")}), "not awaiting resolution");
     await fund(); await defaultNow(); await afterChallenge();
-    await escrow.connect(stranger).liquidate(1);
+    await expireAuctionAndBurn(1);
     await expectRevert(escrow.connect(lender).lenderWaive(1), "not waivable");
     await expectRevert(escrow.connect(arbiter).arbitrate(1,true,{value:ETH("1.1")}), "not disputed");
     eq(await escrow.credits(lender.address), ETH("1.1"));
@@ -188,7 +195,9 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     await escrow.connect(lender).dispute(1);
     await expectRevert(escrow.connect(arbiter).arbitrate(1, false), "challenge open");
     await afterChallenge();
-    await escrow.connect(arbiter).arbitrate(1, false);
+    await escrow.connect(arbiter).arbitrate(1, false); // opens sale
+    await expectRevert(escrow.burnUnsold(1), "auction still active");
+    await expireAuctionAndBurn(1, true);
     eq(await escrow.credits(lender.address), ETH("1.1"));
     eq(await escrow.credits(borrower.address), ETH("0.9"));
     eq(await escrow.credits(arbiter.address), ethers.constants.Zero);
@@ -201,7 +210,7 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     const l = await escrow.loanInfo(1);
     await warpAt(l.defaultAt.toNumber() + l.challenge.toNumber() + l.arbitrateFor.toNumber() + 1);
     await expectRevert(escrow.connect(arbiter).arbitrate(1,true), "arbitration expired");
-    await escrow.connect(stranger).liquidate(1);
+    await expireAuctionAndBurn(1);
     eq(await escrow.credits(lender.address), ETH("1.1"));
     eq(await escrow.credits(borrower.address), ETH("0.9"));
   });
@@ -256,7 +265,7 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
       principal: ETH("1"), payoff: ETH("1.1"),
       fundingDeadline: now + 1000,
       term: 200, grace: 100, challenge: 120, arbitrateFor: 120,
-      termsHash: TERMS
+      termsHash: TERMS, saleStartPrice: ETH("3"), saleDuration: 3600
     };
 
     await probe.mintAndOffer(contractOffer, { value: ETH("2") });
@@ -298,7 +307,8 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
       tokenId: 2, lender: lender.address, arbiter: arbiter.address,
       principal: ETH("0.5"), payoff: ETH("0.55"),
       fundingDeadline: now + 1000, term: 200, grace: 100,
-      challenge: 120, arbitrateFor: 120, termsHash: TERMS
+      challenge: 120, arbitrateFor: 120, termsHash: TERMS,
+      saleStartPrice: ETH("4"), saleDuration: 3600
     };
     await escrow.connect(stranger).propose(second);
     await escrow.connect(lender).fund(2, TERMS, { value: ETH("0.5") });
@@ -311,8 +321,12 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     await escrow.declareDefault(2);
     const final = await escrow.loanInfo(2);
     await warpAt(final.defaultAt.toNumber() + final.challenge.toNumber() + 1);
-    await escrow.liquidate(2);
-    await escrow.liquidate(1);
+    await escrow.startSale(2);
+    await escrow.startSale(1);
+    const active = await escrow.loanInfo(2);
+    await warpAt(active.saleStartedAt.toNumber()+active.saleDuration.toNumber()+1);
+    await escrow.burnUnsold(2);
+    await escrow.burnUnsold(1);
 
     eq(await escrow.credits(lender.address), ETH("1.65"));
     eq(await escrow.credits(borrower.address), ETH("1.0"));
