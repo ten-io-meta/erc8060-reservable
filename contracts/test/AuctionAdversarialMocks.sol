@@ -47,6 +47,7 @@ contract AuctionFakeValueNFT is ERC721 {
         id = nextTokenId++;
         _safeMint(msg.sender, id);
     }
+    receive() external payable {}
     function valueOf(uint256) external pure returns (uint256) {
         return 2 ether;
     }
