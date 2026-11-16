@@ -5,8 +5,8 @@ import "forge-std/Test.sol";
 import "forge-std/StdInvariant.sol";
 import "forge-std/Vm.sol";
 
-import "../contracts/reference/ERC8060NativeETHReference.sol";
-import "../contracts/reference/ReservableConditionalETHReference.sol";
+import "../contracts/vault/ERC8060NativeETHReference.sol";
+import "../contracts/vault/ReservableConditionalETHReference.sol";
 
 /// @notice Ghost ledgers are maintained by independent fuzz handlers, not
 ///         derived from the contracts under test.
@@ -250,12 +250,12 @@ contract ConditionalETHHandler is FuzzActors {
 }
 
 contract StrictETHInvariant is StdInvariant, Test {
-    ERC8060NativeETHReference internal reference;
+    ERC8060NativeETHReference internal vault;
     StrictETHHandler internal handler;
 
     function setUp() public {
-        reference = new ERC8060NativeETHReference();
-        handler = new StrictETHHandler(reference);
+        vault = new ERC8060NativeETHReference();
+        handler = new StrictETHHandler(vault);
         handler.mint(0, 1000); // seed a real ETH liability
         targetContract(address(handler));
     }
@@ -265,30 +265,30 @@ contract StrictETHInvariant is StdInvariant, Test {
         for (uint256 id = 1; id <= handler.minted(); id++) {
             (bool live, address owner, uint256 value) = handler.token(id);
             if (!live) continue;
-            assertEq(reference.ownerOf(id), owner, "strict owner");
-            assertEq(reference.valueOf(id), value, "strict per-NFT backing");
+            assertEq(vault.ownerOf(id), owner, "strict owner");
+            assertEq(vault.valueOf(id), value, "strict per-NFT backing");
             sum += value;
         }
         assertEq(sum, handler.ghostOutstanding(), "strict ghost obligations");
-        assertEq(reference.totalRedeemableValue(), sum, "strict onchain liabilities");
-        assertEq(address(reference).balance, sum, "strict actual ETH");
-        assertTrue(reference.isSolvent(), "strict undercollateralization");
+        assertEq(vault.totalRedeemableValue(), sum, "strict onchain liabilities");
+        assertEq(address(vault).balance, sum, "strict actual ETH");
+        assertTrue(vault.isSolvent(), "strict undercollateralization");
     }
 
     function invariant_strictIDsAndExercise() public view {
-        assertEq(reference.nextTokenId(), handler.minted() + 1, "strict IDs");
+        assertEq(vault.nextTokenId(), handler.minted() + 1, "strict IDs");
         assertGe(handler.successfulCalls(), 1, "handler seeded transaction");
     }
 }
 
 contract ConditionalETHInvariant is StdInvariant, Test {
-    ReservableConditionalETHReference internal reference;
+    ReservableConditionalETHReference internal vault;
     ConditionalETHHandler internal handler;
     address internal constant ETH = address(0);
 
     function setUp() public {
-        reference = new ReservableConditionalETHReference();
-        handler = new ConditionalETHHandler(reference);
+        vault = new ReservableConditionalETHReference();
+        handler = new ConditionalETHHandler(vault);
         handler.mint(0, 10000);
         handler.approve(0, 0, 1e15);
         handler.reserve(0, 0, 1e14);
@@ -306,23 +306,23 @@ contract ConditionalETHInvariant is StdInvariant, Test {
                 locked += individualLock;
                 uint256 room = epoch == grantEpoch && approved > individualLock
                     ? approved - individualLock : 0;
-                assertEq(reference.reserveAllowance(id, handler.spender(k), ETH), room, "spender allowance");
+                assertEq(vault.reserveAllowance(id, handler.spender(k), ETH), room, "spender allowance");
             }
             assertLe(locked, backing, "overreserved backing");
-            assertEq(reference.ownerOf(id), handler.actor(ownerIndex), "conditional owner");
-            assertEq(reference.backingOf(id), backing, "conditional backing");
-            assertEq(reference.lockedValue(id, ETH), locked, "aggregate lock");
-            assertEq(reference.availableValue(id, ETH), backing - locked, "unreserved backing");
+            assertEq(vault.ownerOf(id), handler.actor(ownerIndex), "conditional owner");
+            assertEq(vault.backingOf(id), backing, "conditional backing");
+            assertEq(vault.lockedValue(id, ETH), locked, "aggregate lock");
+            assertEq(vault.availableValue(id, ETH), backing - locked, "unreserved backing");
             sum += backing;
         }
         assertEq(sum, handler.ghostOutstanding(), "conditional ghost liabilities");
-        assertEq(reference.totalBacked(), sum, "conditional onchain liabilities");
-        assertEq(address(reference).balance, sum, "conditional actual ETH");
-        assertTrue(reference.isSolvent(), "conditional undercollateralization");
+        assertEq(vault.totalBacked(), sum, "conditional onchain liabilities");
+        assertEq(address(vault).balance, sum, "conditional actual ETH");
+        assertTrue(vault.isSolvent(), "conditional undercollateralization");
     }
 
     function invariant_conditionalMonotoneIDs() public view {
-        assertEq(reference.nextTokenId(), handler.minted() + 1, "no ID reuse");
+        assertEq(vault.nextTokenId(), handler.minted() + 1, "no ID reuse");
         assertGe(handler.successfulCalls(), 3, "handler must exercise mint/approval/reserve");
     }
 
@@ -336,22 +336,22 @@ contract ConditionalETHInvariant is StdInvariant, Test {
         address spender = address(0xCAFE);
         vm.deal(seller, 100 ether);
         vm.prank(seller);
-        uint256 id = reference.mint{value: amount}();
+        uint256 id = vault.mint{value: amount}();
         vm.prank(seller);
-        reference.approveReserve(id, spender, ETH, amount);
+        vault.approveReserve(id, spender, ETH, amount);
         vm.prank(spender);
-        reference.reserveValue(id, ETH, amount);
+        vault.reserveValue(id, ETH, amount);
         vm.prank(seller);
-        reference.transferFrom(seller, buyer, id);
+        vault.transferFrom(seller, buyer, id);
         vm.prank(buyer);
-        reference.approveReserve(id, spender, ETH, 0);
+        vault.approveReserve(id, spender, ETH, 0);
         vm.expectRevert(bytes("active reservation blocks redemption"));
         vm.prank(buyer);
-        reference.redeemWhenUnlocked(id);
+        vault.redeemWhenUnlocked(id);
         vm.expectRevert(bytes("release exceeds allocation"));
         vm.prank(buyer);
-        reference.releaseValue(id, ETH, amount);
-        assertEq(reference.lockedValue(id, ETH), amount, "lock not silently bypassed");
-        assertEq(address(reference).balance, amount + 10001, "backing remains present");
+        vault.releaseValue(id, ETH, amount);
+        assertEq(vault.lockedValue(id, ETH), amount, "lock not silently bypassed");
+        assertEq(address(vault).balance, amount + 10001, "backing remains present");
     }
 }
