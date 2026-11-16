@@ -81,7 +81,7 @@ describe("Market-first ERC8060 collateral liquidation — lender, debtor, buyer 
     const paid=ev.args.price;
     expect(paid.lt(ETH("3")) && paid.gt(ETH("2"))).to.equal(true);
     expect(await nft.ownerOf(1)).to.equal(buyer.address);
-    eq(await nft.valueOf(1),ETH("2")); // NFT and market premium survive
+    eq(await nft["valueOf(uint256)"](1),ETH("2")); // NFT and market premium survive
     eq(await ethers.provider.getBalance(nft.address),ETH("2"));
     eq(await loan.credits(lender.address),ETH("1.1"));
     eq(await loan.credits(borrower.address),paid.sub(ETH("1.1")));
