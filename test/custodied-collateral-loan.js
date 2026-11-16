@@ -190,4 +190,47 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     await escrow.connect(lender).dispute(1);
     await expectRevert(escrow.connect(lender).dispute(1), "not defaulted");
   });
+  it("smart-contract borrower rejecting ETH cannot leave a half-funded loan; callback cannot cancel funded collateral", async function () {
+    const Probe = await ethers.getContractFactory("LoanBorrowerReceiverProbe");
+    const probe = await Probe.deploy(collateral.address, escrow.address);
+    await probe.deployed();
+
+    const now = (await ethers.provider.getBlock("latest")).timestamp;
+    const contractOffer = {
+      tokenId: 2, lender: lender.address, arbiter: arbiter.address,
+      principal: ETH("1"), payoff: ETH("1.1"),
+      fundingDeadline: now + 1000,
+      term: 200, grace: 100, challenge: 120, arbitrateFor: 120,
+      termsHash: TERMS
+    };
+
+    await probe.mintAndOffer(contractOffer, { value: ETH("2") });
+    expect(await collateral.ownerOf(2)).to.equal(escrow.address);
+    await expectRevert(
+      escrow.connect(lender).fund(1, TERMS, { value: ETH("1") }),
+      "borrower cannot receive ETH"
+    );
+    expect((await escrow.loanInfo(1)).state).to.equal(1); // still Proposed
+    eq(await ethers.provider.getBalance(escrow.address), ethers.constants.Zero);
+    expect(await collateral.ownerOf(2)).to.equal(escrow.address);
+
+    await probe.configure(false, true);
+    await escrow.connect(lender).fund(1, TERMS, { value: ETH("1") });
+    expect((await escrow.loanInfo(1)).state).to.equal(2); // Active
+    expect(await probe.callbackBlocked()).to.equal(true);
+    eq(await ethers.provider.getBalance(probe.address), ETH("1"));
+    await expectRevert(escrow.connect(stranger).cancelUnfunded(1, stranger.address), "not proposed");
+    expect(await collateral.ownerOf(2)).to.equal(escrow.address);
+  });
+
+  it("a third party cannot withdraw the lender's or borrower's credited ETH", async function () {
+    await propose(); await fund();
+    await escrow.connect(borrower).repay(1, { value: ETH("0.5") });
+    await expectRevert(escrow.connect(stranger).withdrawCredit(stranger.address), "no credit");
+    eq(await escrow.credits(lender.address), ETH("0.5"));
+    await escrow.connect(lender).withdrawCredit(stranger.address);
+    eq(await escrow.credits(lender.address), ethers.constants.Zero);
+    eq(await escrow.totalCredits(), ethers.constants.Zero);
+  });
+
 });
