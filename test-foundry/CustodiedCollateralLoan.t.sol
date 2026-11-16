@@ -43,7 +43,9 @@ contract CustodiedCollateralLoanFoundryTest is Test {
             grace: uint64(1 days),
             challenge: uint64(1 days),
             arbitrateFor: uint64(1 days),
-            termsHash: TERMS
+            termsHash: TERMS,
+            saleStartPrice: uint128(backing * 2),
+            saleDuration: uint64(1 hours)
         });
         id = loan.propose(offer);
         vm.stopPrank();
@@ -57,6 +59,12 @@ contract CustodiedCollateralLoanFoundryTest is Test {
         loan.fund{value: principal}(id, TERMS);
         assertEq(BORROWER.balance, beforeBalance + principal, "actual lender funding to borrower");
         assertEq(address(loan).balance, 0, "principal not held as phantom collateral");
+    }
+
+    function _openExpireAndBurn(uint256 id) internal {
+        loan.startSale(id);
+        vm.warp(block.timestamp + 1 hours + 1);
+        loan.burnUnsold(id);
     }
 
     function testFuzz_DefaultBurnPaysOnlyOutstandingAndReturnsSurplus(
@@ -80,10 +88,14 @@ contract CustodiedCollateralLoanFoundryTest is Test {
         vm.warp(block.timestamp + 4 days);
         loan.declareDefault(id);
         vm.expectRevert(bytes("challenge open"));
-        loan.liquidate(id);
+        loan.startSale(id);
         vm.warp(block.timestamp + 2 days);
+        loan.startSale(id);
+        vm.expectRevert(bytes("auction still active"));
+        loan.burnUnsold(id);
+        vm.warp(block.timestamp + 1 hours + 1);
         vm.prank(OUTSIDER);
-        loan.liquidate(id);
+        loan.burnUnsold(id);
 
         assertEq(collateral.totalRedeemableValue(), 0, "NFT backing burned exactly once");
         assertEq(address(collateral).balance, 0, "original NFT backing moved");
@@ -91,8 +103,8 @@ contract CustodiedCollateralLoanFoundryTest is Test {
         assertEq(loan.credits(BORROWER), backing - (payoff - paid), "borrower gets residual ETH");
         assertEq(loan.totalCredits(), paid + backing, "no double-credit");
         assertEq(address(loan).balance, loan.totalCredits(), "real ETH equals all claims");
-        vm.expectRevert(bytes("not liquidatable"));
-        loan.liquidate(id);
+        vm.expectRevert(bytes("not sale open"));
+        loan.burnUnsold(id);
 
         vm.prank(LENDER);
         loan.withdrawCredit(payable(LENDER));
@@ -172,10 +184,10 @@ contract CustodiedCollateralLoanFoundryTest is Test {
         vm.prank(BORROWER);
         loan.dispute(id);
         vm.expectRevert(bytes("arbitration open"));
-        loan.liquidate(id);
+        loan.startSale(id);
         vm.warp(block.timestamp + 3 days);
         vm.prank(OUTSIDER);
-        loan.liquidate(id);
+        _openExpireAndBurn(id);
         assertEq(loan.credits(LENDER), 1.1 ether);
         assertEq(loan.credits(BORROWER), 0.9 ether);
     }
@@ -196,7 +208,7 @@ contract CustodiedCollateralLoanFoundryTest is Test {
         vm.warp(block.timestamp + 4 days);
         loan.declareDefault(id);
         vm.warp(block.timestamp + 2 days);
-        loan.liquidate(id);
+        _openExpireAndBurn(id);
 
         assertEq(loan.credits(LENDER), 1);
         assertEq(loan.credits(BORROWER), 0, "zero surplus means no credit");
@@ -264,8 +276,8 @@ contract CustodiedCollateralLoanFoundryTest is Test {
         assertEq(loan.credits(LENDER), 1.1 ether, "full lender claim must be funded");
         assertEq(loan.totalCredits(), 1.1 ether);
         assertEq(address(loan).balance, 1.1 ether);
-        vm.expectRevert(bytes("not liquidatable"));
-        loan.liquidate(id);
+        vm.expectRevert(bytes("not saleable"));
+        loan.startSale(id);
         vm.expectRevert(bytes("not awaiting resolution"));
         vm.prank(OUTSIDER);
         loan.settleAfterDefault{value: owed}(id);
