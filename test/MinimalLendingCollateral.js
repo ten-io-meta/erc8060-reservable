@@ -990,7 +990,12 @@ it("settling escrow does not affect loan or task bond", async function () {
     seller.address
   );
 
-  await expect(escrow.settleEscrow(0)).to.be.revertedWith("settlement not implemented");
+  try {
+    await escrow.settleEscrow(0);
+    expect.fail("expected settlement rejection");
+  } catch (error) {
+    expect(error.message).to.include("settlement not implemented");
+  }
 
   expect((await token.lockedValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal("900");
   expect((await token.availableValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal("100");
@@ -1069,7 +1074,12 @@ it("settling task bond does not affect loan or escrow", async function () {
     seller.address
   );
 
-  await expect(bond.settleTaskBond(0)).to.be.revertedWith("settlement not implemented");
+  try {
+    await bond.settleTaskBond(0);
+    expect.fail("expected settlement rejection");
+  } catch (error) {
+    expect(error.message).to.include("settlement not implemented");
+  }
 
   expect((await token.lockedValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal("900");
   expect((await token.availableValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal("100");
