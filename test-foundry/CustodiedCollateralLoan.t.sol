@@ -21,6 +21,7 @@ contract CustodiedCollateralLoanFoundryTest is Test {
         vm.deal(BORROWER, 100 ether);
         vm.deal(LENDER, 100 ether);
         vm.deal(OUTSIDER, 100 ether);
+        vm.deal(ARBITER, 100 ether);
         collateral = new ERC8060NativeETHReference();
         loan = new CustodiedCollateralLoanPoC(address(collateral));
     }
@@ -132,7 +133,7 @@ contract CustodiedCollateralLoanFoundryTest is Test {
         loan.declareDefault(id);
     }
 
-    function test_ArbitrationForgivenessNeedsNamedResolverAndDoesNotPayFromNFT() public {
+    function test_ArbitrationMayReturnNFTOnlyAfterActualCreditorPayment() public {
         uint256 id = _propose(2 ether, 1 ether, 1.1 ether);
         _fund(id, 1 ether);
         vm.warp(block.timestamp + 4 days);
@@ -143,14 +144,24 @@ contract CustodiedCollateralLoanFoundryTest is Test {
         vm.expectRevert(bytes("not arbiter"));
         vm.prank(OUTSIDER);
         loan.arbitrate(id, true);
+        vm.expectRevert(bytes("exact payoff required"));
         vm.prank(ARBITER);
         loan.arbitrate(id, true);
+        vm.expectRevert(bytes("exact payoff required"));
+        vm.prank(ARBITER);
+        loan.arbitrate{value: 1 ether}(id, true);
+        vm.expectRevert(bytes("not releasable"));
         vm.prank(BORROWER);
         loan.claimCollateral(id, BORROWER);
 
-        assertEq(collateral.ownerOf(1), BORROWER, "trusted arbitrator returns NFT");
-        assertEq(loan.credits(LENDER), 0, "offchain relief does not fabricate payment");
-        assertEq(address(collateral).balance, 2 ether, "no unintended collateral burn");
+        vm.prank(ARBITER);
+        loan.arbitrate{value: 1.1 ether}(id, true);
+        assertEq(loan.credits(LENDER), 1.1 ether, "credit requires real ETH");
+        assertEq(address(loan).balance, 1.1 ether, "credit must be funded");
+        vm.prank(BORROWER);
+        loan.claimCollateral(id, BORROWER);
+        assertEq(collateral.ownerOf(1), BORROWER, "fully funded dispute settlement returns NFT");
+        assertEq(address(collateral).balance, 2 ether, "collateral stays alive after payment");
     }
 
     function test_ArbitrationTimeoutHasDeterministicDefaultNotEternalLock() public {
@@ -199,6 +210,68 @@ contract CustodiedCollateralLoanFoundryTest is Test {
         loan.withdrawCredit(payable(LENDER));
         assertEq(address(loan).balance, 0);
         assertEq(loan.totalCredits(), 0);
+    }
+
+    function testFuzz_LenderOnlyWaiverPreservesAlreadyPaidCredits(uint96 repaymentRaw) public {
+        uint256 id = _propose(2 ether, 1 ether, 1.1 ether);
+        _fund(id, 1 ether);
+        uint256 paid = uint256(repaymentRaw) % 1.1 ether;
+        if (paid > 0) {
+            vm.prank(BORROWER);
+            loan.repay{value: paid}(id);
+        }
+        vm.warp(block.timestamp + 4 days);
+        loan.declareDefault(id);
+        vm.prank(BORROWER);
+        loan.dispute(id);
+
+        vm.expectRevert(bytes("not lender"));
+        vm.prank(ARBITER);
+        loan.lenderWaive(id);
+        vm.expectRevert(bytes("not lender"));
+        vm.prank(BORROWER);
+        loan.lenderWaive(id);
+
+        vm.prank(LENDER);
+        loan.lenderWaive(id);
+        assertEq(loan.credits(LENDER), paid, "already paid ETH cannot disappear");
+        assertEq(address(loan).balance, paid, "no new/fake credit");
+        vm.prank(BORROWER);
+        loan.claimCollateral(id, BORROWER);
+        assertEq(collateral.ownerOf(1), BORROWER);
+        assertEq(collateral.totalRedeemableValue(), 2 ether);
+    }
+
+    function testFuzz_DefaultCureRequiresExactETHAndPreventsLiquidation(uint96 repaidRaw) public {
+        uint256 id = _propose(2 ether, 1 ether, 1.1 ether);
+        _fund(id, 1 ether);
+        uint256 paid = uint256(repaidRaw) % 1.1 ether;
+        if (paid > 0) {
+            vm.prank(BORROWER);
+            loan.repay{value: paid}(id);
+        }
+        vm.warp(block.timestamp + 4 days);
+        loan.declareDefault(id);
+
+        uint256 owed = 1.1 ether - paid;
+        vm.expectRevert(bytes("exact payoff required"));
+        vm.prank(OUTSIDER);
+        loan.settleAfterDefault{value: owed - 1}(id);
+        assertEq(loan.credits(LENDER), paid);
+
+        vm.prank(OUTSIDER);
+        loan.settleAfterDefault{value: owed}(id);
+        assertEq(loan.credits(LENDER), 1.1 ether, "full lender claim must be funded");
+        assertEq(loan.totalCredits(), 1.1 ether);
+        assertEq(address(loan).balance, 1.1 ether);
+        vm.expectRevert(bytes("not liquidatable"));
+        loan.liquidate(id);
+        vm.expectRevert(bytes("not awaiting resolution"));
+        vm.prank(OUTSIDER);
+        loan.settleAfterDefault{value: owed}(id);
+        vm.prank(BORROWER);
+        loan.claimCollateral(id, BORROWER);
+        assertEq(collateral.ownerOf(1), BORROWER);
     }
 
 }
