@@ -12,11 +12,12 @@ This experiment tests the hypothesis that contracts can expose a **restricted, e
 - `REJECT`: a recognized composition lacks the requested structural capability or is incompatible.
 - `UNKNOWN`: deployment provenance of the asset or application is unrecognized. Never promote to ACCEPT.
 
-The gate is a **closed-world, immutable experimental deployment factory**:
-- It uses `new ERC8060NativeETHReference()` / `new ReservableConditionalETHReference()` to execute the actual constructors, then records the resulting addresses.
-- It creates the exact `BilateralTimeboundReserve`, `ReservableRepaymentLoanDemo`, and `CustodiedCollateralLoanPoC` via `new`, recording the asset bound at creation.
+The gate is a **closed-world experimental verifier linked to three non-upgradeable factories**. The first monolithic verifier compiled to **52,053 runtime bytes**, beyond EIP-170's **24,576-byte** limit; the architecture was split so each deployed contract can meet that limit:
+- The asset factory uses `new ERC8060NativeETHReference()` / `new ReservableConditionalETHReference()` to run the true constructors and record resulting addresses.
+- Separate accounting and recovery factories create the exact `BilateralTimeboundReserve`, `ReservableRepaymentLoanDemo`, and `CustodiedCollateralLoanPoC` contracts and record the asset bound at creation.
 - It cannot accept caller-provided third-party code, arbitrary factory signatures, UI claims, ERC165 declarations, user-provided code hashes, or donated ETH as proof of provenance.
-- Deployment of **the gate itself** still requires independent verification and is a trust root; similarly, local acceptance does not prove source/audit quality or constructor provenance outside this factory.
+- Deployment provenance of **the gate and all three factory addresses** must be independently verified. Their runtime code hashes and cross-factory binding are checked at gate construction but, by themselves, cannot prove their initial storage was not forged. Local acceptance does not establish source/audit quality outside this trusted deployment tree.
+- The Foundry regression explicitly checks every factory and the gate fits the EIP-170 maximum runtime size (24,576 bytes). Passing these checks remains necessary, not sufficient, for production.
 
 ## Capabilities evaluated (explicitly bounded)
 
@@ -42,7 +43,7 @@ The gate is a **closed-world, immutable experimental deployment factory**:
 
 ## Evidence layers (avoid conflating)
 
-1. **Provenance evidence:** factory-only creation path for the gate's own NFTs and applications.
+1. **Provenance evidence:** factory-only creation path for accepted NFTs and applications; the factory deployment root must be independently authenticated.
 2. **Capability evidence:** explicit onchain identity, associations, solvency and loan state checked at block execution.
 3. **Execution evidence:** Foundry end-to-end traces of real funding, repayment or burn, and ETH credit withdrawals.
 4. **Test receipts:** commit SHA and CI workflow logs; these are external reproducible testing evidence. **No onchain transaction can prove that an arbitrary offchain test suite ran honestly.**
@@ -51,7 +52,7 @@ The gate's `AssessmentReceipt` event is evidence of a particular onchain *decisi
 
 ## Remaining limitations
 
-- Trusted gate deployer/code and Solidity compiled implementations; third-party or adversarial contracts are not admitted by this prototype.
+- Trusted, genuinely deployed gate and three factory contracts, plus Solidity-compiled implementations; third-party or adversarial contracts are not admitted by this prototype.
 - Exact reference contracts may still contain uncaught flaws. Registration is **not** auditing.
 - Static state assessment can go stale between transaction admission and actual settlement; an executing application must re-check its own onchain conditions.
 - This does not verify a loan's borrower/lender understanding, contract-encoded policy appropriateness, market liquidity, MEV resistance or liveness guarantees.
