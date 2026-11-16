@@ -1,0 +1,28 @@
+[profile.default]
+src = "contracts"
+test = "test-foundry"
+out = "out-foundry"
+cache_path = "cache-foundry"
+libs = ["lib", "node_modules"]
+solc_version = "0.8.20"
+auto_detect_remappings = true
+remappings = [
+  "@openzeppelin/=node_modules/@openzeppelin/",
+  "forge-std/=lib/forge-std/src/",
+  "ds-test/=lib/forge-std/lib/ds-test/src/"
+]
+
+[fuzz]
+runs = 256
+
+[invariant]
+runs = 64
+depth = 48
+fail_on_revert = true
+show_metrics = true
+
+[profile.ci.invariant]
+runs = 96
+depth = 64
+fail_on_revert = true
+show_metrics = true
