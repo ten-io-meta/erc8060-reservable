@@ -21,13 +21,15 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
     uint256 public constant MAX_GRACE = 30 days;
     uint256 public constant MAX_CHALLENGE = 30 days;
     uint256 public constant MAX_ARBITER_WINDOW = 30 days;
+    uint256 public constant MIN_SALE_DURATION = 1 hours;
+    uint256 public constant MAX_SALE_DURATION = 30 days;
 
     IERC721 public immutable nft;
     IERC721ValueReference public immutable valueNft;
 
     enum State {
         Unknown, Proposed, Active, Repaid, Defaulted, Disputed,
-        Forgiven, Liquidated, NFTReturned, Cancelled
+        Forgiven, Liquidated, NFTReturned, Cancelled, SaleOpen, Sold
     }
 
     struct Loan {
@@ -46,6 +48,10 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
         uint64 dueAt;
         uint64 defaultAt;
         bytes32 termsHash;
+        uint128 saleStartPrice;
+        uint256 redemptionFloor;
+        uint64 saleDuration;
+        uint64 saleStartedAt;
         State state;
     }
 
@@ -61,6 +67,8 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
         uint64 challenge;
         uint64 arbitrateFor;
         bytes32 termsHash;
+        uint128 saleStartPrice;
+        uint64 saleDuration;
     }
 
     uint256 public nextLoanId = 1;
@@ -94,6 +102,10 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
     event Liquidated(uint256 indexed loanId, uint256 redeemed, uint256 lenderAward, uint256 borrowerSurplus);
     event NFTReleased(uint256 indexed loanId, address indexed receiver);
     event CreditWithdrawn(address indexed creditor, address indexed recipient, uint256 amount);
+    event SaleOpened(uint256 indexed loanId, uint256 startPrice, uint256 floorPrice, uint256 endTime);
+    event NFTSold(uint256 indexed loanId, address indexed buyer, address indexed recipient, uint256 price,
+                  uint256 lenderAward, uint256 borrowerSurplus, uint256 buyerRefund);
+    event UnsoldNFTBurned(uint256 indexed loanId, uint256 redeemed);
 
     constructor(address nft_) {
         require(nft_ != address(0) && nft_.code.length != 0, "invalid NFT");
@@ -120,7 +132,11 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
         require(o.challenge > 0 && o.challenge <= MAX_CHALLENGE, "invalid challenge");
         require(o.arbitrateFor > 0 && o.arbitrateFor <= MAX_ARBITER_WINDOW,
                 "invalid arbitration period");
-        require(valueNft.valueOf(o.tokenId) >= o.payoff, "insufficient ETH backing");
+        uint256 floor = valueNft.valueOf(o.tokenId);
+        require(floor >= o.payoff, "insufficient ETH backing");
+        require(o.saleStartPrice >= floor, "sale price below ETH floor");
+        require(o.saleDuration >= MIN_SALE_DURATION && o.saleDuration <= MAX_SALE_DURATION,
+                "invalid sale duration");
 
         id = nextLoanId++;
         Loan storage l = _loans[id];
@@ -136,6 +152,9 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
         l.challenge = o.challenge;
         l.arbitrateFor = o.arbitrateFor;
         l.termsHash = o.termsHash;
+        l.saleStartPrice = o.saleStartPrice;
+        l.redemptionFloor = floor;
+        l.saleDuration = o.saleDuration;
         l.state = State.Proposed;
 
         expectingNFT = true;
@@ -160,7 +179,8 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
         require(block.timestamp <= l.fundingDeadline, "funding expired");
         require(msg.value == l.principal, "wrong principal");
         require(nft.ownerOf(l.tokenId) == address(this), "collateral missing");
-        require(valueNft.valueOf(l.tokenId) >= l.payoff, "insufficient ETH backing");
+        require(valueNft.valueOf(l.tokenId) == l.redemptionFloor,
+                "ETH backing changed");
 
         l.state = State.Active;
         l.dueAt = uint64(block.timestamp + l.term);
@@ -255,7 +275,7 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
             require(block.timestamp > uint256(l.defaultAt) + l.challenge,
                     "challenge open");
             emit Arbitrated(id, false);
-            _liquidate(id, l);
+            _startSale(id, l);
         }
     }
 
@@ -267,7 +287,7 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
     function lenderWaive(uint256 id) external nonReentrant {
         Loan storage l = _loans[id];
         require(l.state == State.Active || l.state == State.Defaulted
-                || l.state == State.Disputed, "not waivable");
+                || l.state == State.Disputed || l.state == State.SaleOpen, "not waivable");
         require(msg.sender == l.lender, "not lender");
         l.state = State.Forgiven;
         emit LenderWaived(id, msg.sender, l.payoff - l.repaid);
@@ -279,8 +299,8 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
     ///      and liquidation are mutually exclusive after either succeeds.
     function settleAfterDefault(uint256 id) external payable nonReentrant {
         Loan storage l = _loans[id];
-        require(l.state == State.Defaulted || l.state == State.Disputed,
-                "not awaiting resolution");
+        require(l.state == State.Defaulted || l.state == State.Disputed
+                || l.state == State.SaleOpen, "not awaiting resolution");
         _settleOutstanding(id, l, msg.value);
     }
 
@@ -294,39 +314,107 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
         emit Repaid(id, msg.sender, payment, l.repaid);
     }
 
-    /// @notice Permissionless liquidation only after accepted challenge time,
-    ///         and also after arbitration timeout if a dispute was raised.
-    ///         Never releases collateral merely because the debt is due.
-    function liquidate(uint256 id) external nonReentrant {
+    /// @notice After the creditor's challenge/arbitration protections, ANYONE
+    ///         can begin the borrower-agreed Dutch auction before a burn.
+    function startSale(uint256 id) external nonReentrant {
         Loan storage l = _loans[id];
         if (l.state == State.Defaulted) {
             require(block.timestamp > uint256(l.defaultAt) + l.challenge, "challenge open");
         } else if (l.state == State.Disputed) {
             require(block.timestamp > _resolutionDeadline(l), "arbitration open");
         } else {
-            revert("not liquidatable");
+            revert("not saleable");
         }
-        _liquidate(id, l);
+        _startSale(id, l);
     }
 
     function _resolutionDeadline(Loan storage l) private view returns (uint256) {
         return uint256(l.defaultAt) + l.challenge + l.arbitrateFor;
     }
 
-    function _liquidate(uint256 id, Loan storage l) private {
-        uint256 expectedBacking = valueNft.valueOf(l.tokenId);
-        uint256 owed = l.payoff - l.repaid;
-        require(expectedBacking >= owed, "insufficient redeemable collateral");
+    /// @dev The immutable terms commit to start price/duration; the ETH floor
+    ///      is verified again before launch. No actor can repricing afterwards.
+    function _startSale(uint256 id, Loan storage l) private {
+        require(nft.ownerOf(l.tokenId) == address(this), "collateral missing");
+        require(valueNft.valueOf(l.tokenId) == l.redemptionFloor, "ETH backing changed");
+        l.state = State.SaleOpen;
+        l.saleStartedAt = uint64(block.timestamp);
+        emit SaleOpened(id, l.saleStartPrice, l.redemptionFloor,
+                        block.timestamp + l.saleDuration);
+    }
+
+    /// @notice Linear Dutch auction from pre-agreed starting price DOWN to
+    ///         backed-ETH floor, never below it. Buyers decide if premium
+    ///         is worthwhile. No oracle or guarantee of market-clearing price.
+    function currentSalePrice(uint256 id) public view returns (uint256) {
+        Loan storage l = _loans[id];
+        require(l.state == State.SaleOpen, "not sale open");
+        uint256 elapsed = block.timestamp - uint256(l.saleStartedAt);
+        if (elapsed >= l.saleDuration) return l.redemptionFloor;
+        uint256 premium = uint256(l.saleStartPrice) - l.redemptionFloor;
+        return uint256(l.saleStartPrice) - (premium * elapsed) / l.saleDuration;
+    }
+
+    /// @notice Atomically sell the ORIGINAL NFT instead of destroying it.
+    ///         Buyer supplies its total limit; declining-price change is
+    ///         credited back to the authenticated buyer (pull refund).
+    ///         The lender receives only unpaid debt, borrower ALL premium.
+    function buyCollateral(uint256 id, uint256 maxPrice, address recipient)
+        external payable nonReentrant
+    {
+        Loan storage l = _loans[id];
+        require(l.state == State.SaleOpen, "not sale open");
+        require(block.timestamp <= uint256(l.saleStartedAt) + l.saleDuration,
+                "sale ended");
+        require(recipient != address(0) && recipient != address(this),
+                "invalid NFT receiver");
+        uint256 price = currentSalePrice(id);
+        require(price <= maxPrice, "price above maximum");
+        require(msg.value == maxPrice, "wrong bid amount");
+        require(valueNft.valueOf(l.tokenId) == l.redemptionFloor, "ETH backing changed");
         require(nft.ownerOf(l.tokenId) == address(this), "collateral missing");
 
-        // Effect before external ETH callback. A revert on burn or mismatch
-        // unwinds status, creditor balances, NFT burn and all ETH transfers.
+        uint256 owed = l.payoff - l.repaid;
+        require(price >= owed, "auction below debt");
+        uint256 borrowerSurplus = price - owed;
+        uint256 refund = maxPrice - price;
+
+        // Checks-effects-interactions; rejected safe-transfer rolls back sale
+        // and ALL newly allocated ETH credits.
+        l.state = State.Sold;
+        credits[l.lender] += owed;
+        credits[l.borrower] += borrowerSurplus;
+        credits[msg.sender] += refund;
+        totalCredits += maxPrice;
+
+        nft.safeTransferFrom(address(this), recipient, l.tokenId);
+        require(nft.ownerOf(l.tokenId) == recipient, "NFT transfer failed");
+        emit NFTSold(id, msg.sender, recipient, price, owed, borrowerSurplus, refund);
+    }
+
+    /// @notice After a complete, real sale period with no buyer, and ONLY
+    ///         then, burn the NFT and pay out its embedded ETH floor.
+    ///         Cannot be called early, even by lender or arbitrator.
+    function burnUnsold(uint256 id) external nonReentrant {
+        Loan storage l = _loans[id];
+        require(l.state == State.SaleOpen, "not sale open");
+        require(block.timestamp > uint256(l.saleStartedAt) + l.saleDuration,
+                "auction still active");
+        uint256 redeemed = _burnAndCredit(id, l);
+        emit UnsoldNFTBurned(id, redeemed);
+    }
+
+    function _burnAndCredit(uint256 id, Loan storage l) private returns (uint256 received) {
+        uint256 expectedBacking = valueNft.valueOf(l.tokenId);
+        uint256 owed = l.payoff - l.repaid;
+        require(expectedBacking == l.redemptionFloor, "ETH backing changed");
+        require(expectedBacking >= owed, "insufficient redeemable collateral");
+        require(nft.ownerOf(l.tokenId) == address(this), "collateral missing");
         l.state = State.Liquidated;
         uint256 beforeBalance = address(this).balance;
         valueNft.burn(l.tokenId);
-        uint256 received = address(this).balance - beforeBalance;
+        received = address(this).balance - beforeBalance;
         require(received == expectedBacking, "wrong redemption payout");
-
         credits[l.lender] += owed;
         credits[l.borrower] += received - owed;
         totalCredits += received;
