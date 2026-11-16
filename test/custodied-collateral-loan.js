@@ -118,18 +118,71 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     eq(await ethers.provider.getBalance(escrow.address), ethers.constants.Zero);
   });
 
-  it("pre-accepted arbiter can forgive outstanding debt, but only during an active dispute", async function () {
+  it("arbiter cannot forgive unpaid debt: only exact onchain payment permits collateral return", async function () {
     await propose(); await fund(); await defaultNow();
     await expectRevert(escrow.connect(arbiter).arbitrate(1,true), "not disputed");
     await escrow.connect(borrower).dispute(1);
     await expectRevert(escrow.connect(stranger).arbitrate(1,true), "not arbiter");
-    await escrow.connect(arbiter).arbitrate(1,true);
+    await expectRevert(escrow.connect(arbiter).arbitrate(1,true), "exact payoff required");
+    await expectRevert(escrow.connect(arbiter).arbitrate(1,true, {value:ETH("1")}), "exact payoff required");
+    await expectRevert(escrow.connect(arbiter).arbitrate(1,false, {value:ETH("1")}), "no ETH for liquidation");
+    expect((await escrow.loanInfo(1)).state).to.equal(5); // Disputed
+    await escrow.connect(arbiter).arbitrate(1,true, {value:ETH("1.1")});
     await escrow.connect(borrower).claimCollateral(1, borrower.address);
     expect(await collateral.ownerOf(1)).to.equal(borrower.address);
     await expectRevert(escrow.connect(stranger).liquidate(1), "not liquidatable");
-    eq(await escrow.credits(lender.address), ethers.constants.Zero); // offchain claim not enforced
+    eq(await escrow.credits(lender.address), ETH("1.1")); // proof of actual payment
+    eq(await ethers.provider.getBalance(escrow.address), ETH("1.1"));
+    expect(await escrow.isCreditSolvent()).to.equal(true);
   });
 
+
+  it("only lender can voluntarily waive unpaid debt; the arbiter cannot spoof a waiver", async function () {
+    await propose(); await fund();
+    await escrow.connect(borrower).repay(1, {value:ETH("0.2")});
+    await defaultNow();
+    await escrow.connect(borrower).dispute(1);
+    await expectRevert(escrow.connect(arbiter).lenderWaive(1), "not lender");
+    await expectRevert(escrow.connect(borrower).lenderWaive(1), "not lender");
+    await expectRevert(escrow.connect(stranger).lenderWaive(1), "not lender");
+    await expectRevert(escrow.connect(borrower).claimCollateral(1, borrower.address), "not releasable");
+    await escrow.connect(lender).lenderWaive(1);
+    expect((await escrow.loanInfo(1)).state).to.equal(6); // Forgiven by creditor
+    eq(await escrow.credits(lender.address), ETH("0.2")); // existing credits unaffected
+    await escrow.connect(borrower).claimCollateral(1, borrower.address);
+    expect(await collateral.ownerOf(1)).to.equal(borrower.address);
+    await expectRevert(escrow.connect(lender).lenderWaive(1), "not waivable");
+    eq(await ethers.provider.getBalance(escrow.address), ETH("0.2"));
+  });
+
+  it("any payer can cure default with exact outstanding ETH; liquidator cannot then seize NFT", async function () {
+    await propose(); await fund();
+    await escrow.connect(borrower).repay(1, {value:ETH("0.3")});
+    await defaultNow();
+    await escrow.connect(borrower).dispute(1);
+    await expectRevert(escrow.connect(stranger).settleAfterDefault(1, {value: ETH("0.7")}), "exact payoff required");
+    await escrow.connect(stranger).settleAfterDefault(1, {value: ETH("0.8")});
+    eq(await escrow.credits(lender.address), ETH("1.1"));
+    eq(await escrow.totalCredits(), ETH("1.1"));
+    expect(await escrow.isCreditSolvent()).to.equal(true);
+    await expectRevert(escrow.connect(arbiter).arbitrate(1,false), "not disputed");
+    await expectRevert(escrow.connect(stranger).liquidate(1), "not liquidatable");
+    await escrow.connect(borrower).claimCollateral(1, borrower.address);
+    expect(await collateral.ownerOf(1)).to.equal(borrower.address);
+    await expectRevert(escrow.connect(stranger).settleAfterDefault(1,{value:ETH("0.8")}), "not awaiting resolution");
+  });
+
+  it("unfunded or already-liquidated obligations cannot be waived or paid again", async function () {
+    await propose();
+    await expectRevert(escrow.connect(lender).lenderWaive(1), "not waivable");
+    await expectRevert(escrow.connect(stranger).settleAfterDefault(1,{value:ETH("1.1")}), "not awaiting resolution");
+    await fund(); await defaultNow(); await afterChallenge();
+    await escrow.connect(stranger).liquidate(1);
+    await expectRevert(escrow.connect(lender).lenderWaive(1), "not waivable");
+    await expectRevert(escrow.connect(arbiter).arbitrate(1,true,{value:ETH("1.1")}), "not disputed");
+    eq(await escrow.credits(lender.address), ETH("1.1"));
+    eq(await escrow.credits(borrower.address), ETH("0.9"));
+  });
   it("arbiter cannot take ETH or redirect proceeds; upholding default follows exact payoff split", async function () {
     await propose(); await fund(); await defaultNow();
     await escrow.connect(lender).dispute(1);
