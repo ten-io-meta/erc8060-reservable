@@ -15,6 +15,13 @@ describe("AgentTaskBond", function () {
   let reservable;
   let bond;
 
+  async function expectRejected(promise, expected) {
+    let error;
+    try { await promise; } catch (e) { error = e; }
+    expect(error, "expected revert").to.exist;
+    expect(error.message).to.include(expected);
+  }
+
   beforeEach(async function () {
     [owner, agent] = await ethers.getSigners();
 
@@ -73,60 +80,29 @@ describe("AgentTaskBond", function () {
     );
   });
 
-  it("settles task bond", async function () {
-    await bond.createTaskBond(
-      TOKEN_ID,
-      ETH_ASSET,
-      BOND_AMOUNT,
-      agent.address,
-      TASK_HASH
-    );
-
-    await bond.settleTaskBond(0);
-
+  it("rejects unsupported task settlement without changing the lock", async function () {
+    await bond.createTaskBond(TOKEN_ID, ETH_ASSET, BOND_AMOUNT, agent.address, TASK_HASH);
+    await expectRejected(bond.settleTaskBond(0), "settlement not implemented");
     const info = await bond.bonds(0);
-
-    expect(info.settled).to.equal(true);
-    expect(info.active).to.equal(false);
+    expect(info.active).to.equal(true);
+    expect(info.settled).to.equal(false);
+    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).eq(BOND_AMOUNT)).to.equal(true);
   });
 
-  it("cannot release a settled task bond", async function () {
-    await bond.createTaskBond(
-      TOKEN_ID,
-      ETH_ASSET,
-      BOND_AMOUNT,
-      agent.address,
-      TASK_HASH
-    );
-
-    await bond.settleTaskBond(0);
-
-    try {
-      await bond.releaseTaskBond(0);
-      expect.fail("Expected transaction to revert");
-    } catch (error) {
-      expect(error.message).to.include("bond not active");
-    }
-  });
-
-  it("cannot settle a released task bond", async function () {
-    await bond.createTaskBond(
-      TOKEN_ID,
-      ETH_ASSET,
-      BOND_AMOUNT,
-      agent.address,
-      TASK_HASH
-    );
-
+  it("can release a bond after a rejected settlement", async function () {
+    await bond.createTaskBond(TOKEN_ID, ETH_ASSET, BOND_AMOUNT, agent.address, TASK_HASH);
+    await expectRejected(bond.settleTaskBond(0), "settlement not implemented");
     await bond.releaseTaskBond(0);
-
-    try {
-      await bond.settleTaskBond(0);
-      expect.fail("Expected transaction to revert");
-    } catch (error) {
-      expect(error.message).to.include("bond not active");
-    }
+    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).isZero()).to.equal(true);
   });
+
+  it("cannot falsely settle a released task bond", async function () {
+    await bond.createTaskBond(TOKEN_ID, ETH_ASSET, BOND_AMOUNT, agent.address, TASK_HASH);
+    await bond.releaseTaskBond(0);
+    await expectRejected(bond.settleTaskBond(0), "settlement not implemented");
+    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).isZero()).to.equal(true);
+  });
+
   it("multiple task bonds accumulate locked value correctly", async function () {
 
   await reservable.approveReserve(
@@ -210,48 +186,19 @@ it("releasing one task bond does not release other active bonds", async function
   expect(first.active).to.equal(false);
   expect(second.active).to.equal(true);
 });
-it("settling one task bond does not affect other active bonds", async function () {
-  await reservable.approveReserve(
-    TOKEN_ID,
-    bond.address,
-    ETH_ASSET,
-    500
-  );
+  it("rejected settlement does not affect concurrent task bonds", async function () {
+    await reservable.approveReserve(TOKEN_ID, bond.address, ETH_ASSET, 500);
+    await bond.createTaskBond(TOKEN_ID, ETH_ASSET, 100, agent.address, ethers.utils.id("one"));
+    await bond.createTaskBond(TOKEN_ID, ETH_ASSET, 150, agent.address, ethers.utils.id("two"));
+    await expectRejected(bond.settleTaskBond(0), "settlement not implemented");
+    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal("250");
+    const first = await bond.bonds(0);
+    const second = await bond.bonds(1);
+    expect(first.active).to.equal(true);
+    expect(first.settled).to.equal(false);
+    expect(second.active).to.equal(true);
+  });
 
-  await bond.createTaskBond(
-    TOKEN_ID,
-    ETH_ASSET,
-    100,
-    agent.address,
-    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("task-1"))
-  );
-
-  await bond.createTaskBond(
-    TOKEN_ID,
-    ETH_ASSET,
-    150,
-    agent.address,
-    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("task-2"))
-  );
-
-  await bond.settleTaskBond(0);
-
-  expect(
-    (await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()
-  ).to.equal("250");
-
-  expect(
-    (await reservable.availableValue(TOKEN_ID, ETH_ASSET)).toString()
-  ).to.equal("750");
-
-  const first = await bond.bonds(0);
-  const second = await bond.bonds(1);
-
-  expect(first.active).to.equal(false);
-  expect(first.settled).to.equal(true);
-  expect(second.active).to.equal(true);
-  expect(second.settled).to.equal(false);
-});
 it("cannot create task bond with zero amount", async function () {
   try {
     await bond.createTaskBond(
@@ -318,24 +265,13 @@ it("cannot release the same task bond twice", async function () {
   }
 });
 
-it("cannot settle the same task bond twice", async function () {
-  await bond.createTaskBond(
-    TOKEN_ID,
-    ETH_ASSET,
-    BOND_AMOUNT,
-    agent.address,
-    TASK_HASH
-  );
+  it("repeated false settlement attempts never change the bond", async function () {
+    await bond.createTaskBond(TOKEN_ID, ETH_ASSET, BOND_AMOUNT, agent.address, TASK_HASH);
+    await expectRejected(bond.settleTaskBond(0), "settlement not implemented");
+    await expectRejected(bond.settleTaskBond(0), "settlement not implemented");
+    expect((await bond.bonds(0)).active).to.equal(true);
+  });
 
-  await bond.settleTaskBond(0);
-
-  try {
-    await bond.settleTaskBond(0);
-    expect.fail("Expected transaction to revert");
-  } catch (error) {
-    expect(error.message).to.include("bond not active");
-  }
-});
   it("cannot create task bond without sufficient available value", async function () {
   await reservable.approveReserve(
     TOKEN_ID,

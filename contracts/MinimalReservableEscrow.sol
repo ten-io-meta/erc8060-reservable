@@ -3,6 +3,11 @@ pragma solidity ^0.8.20;
 
 import "./IERC8060Reservable.sol";
 
+interface IEscrowOwnerView {
+    function ownerOf(uint256 tokenId) external view returns (address);
+}
+
+/// @notice ACCOUNTING-ONLY DEMO, not a production escrow or payout contract.
 contract MinimalReservableEscrow {
     IERC8060Reservable public immutable reservable;
 
@@ -17,6 +22,7 @@ contract MinimalReservableEscrow {
 
     uint256 public nextEscrowId;
     mapping(uint256 => Escrow) public escrows;
+    mapping(uint256 => address) public creators;
 
     event EscrowCreated(
         uint256 indexed escrowId,
@@ -39,10 +45,14 @@ contract MinimalReservableEscrow {
         uint256 amount,
         address seller
     ) external returns (uint256 escrowId) {
+        require(IEscrowOwnerView(address(reservable)).ownerOf(tokenId) == msg.sender, "not NFT owner");
+        require(seller != address(0), "invalid seller");
+        require(amount > 0, "zero amount");
         reservable.reserveValue(tokenId, asset, amount);
 
         escrowId = nextEscrowId++;
 
+        creators[escrowId] = msg.sender;
         escrows[escrowId] = Escrow({
             tokenId: tokenId,
             asset: asset,
@@ -60,6 +70,7 @@ contract MinimalReservableEscrow {
 
         require(e.active, "Escrow not active");
         require(!e.settled, "Escrow already settled");
+        require(msg.sender == creators[escrowId], "not escrow creator");
 
         e.active = false;
 
@@ -68,19 +79,8 @@ contract MinimalReservableEscrow {
         emit EscrowReleased(escrowId);
     }
 
-    function settleEscrow(uint256 escrowId) external {
-        Escrow storage e = escrows[escrowId];
-
-        require(e.active, "Escrow not active");
-        require(!e.settled, "Escrow already settled");
-
-        e.active = false;
-        e.settled = true;
-
-        // Demo only:
-        // IERC8060Reservable deliberately does not define settlement.
-        // A real application would call its own settlement / payout logic here.
-
-        emit EscrowSettled(escrowId);
+    /// @notice No payout implemented; a false settlement would orphan a lock.
+    function settleEscrow(uint256) external pure {
+        revert("settlement not implemented");
     }
 }

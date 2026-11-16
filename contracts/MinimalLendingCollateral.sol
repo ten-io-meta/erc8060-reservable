@@ -3,6 +3,11 @@ pragma solidity ^0.8.20;
 
 import "./IERC8060Reservable.sol";
 
+interface ILendingOwnerView {
+    function ownerOf(uint256 tokenId) external view returns (address);
+}
+
+/// @notice ACCOUNTING-ONLY DEMO; no loan funding, debt or liquidation.
 contract MinimalLendingCollateral {
     IERC8060Reservable public immutable reservable;
 
@@ -38,6 +43,7 @@ contract MinimalLendingCollateral {
         address asset,
         uint256 collateralAmount
     ) external returns (uint256 loanId) {
+        require(ILendingOwnerView(address(reservable)).ownerOf(tokenId) == msg.sender, "not NFT owner");
         require(collateralAmount > 0, "collateral is zero");
 
         reservable.reserveValue(tokenId, asset, collateralAmount);
@@ -67,6 +73,7 @@ contract MinimalLendingCollateral {
 
         require(l.active, "loan not active");
         require(!l.closed, "loan already closed");
+        require(msg.sender == l.borrower, "not loan creator");
 
         l.active = false;
         l.closed = true;

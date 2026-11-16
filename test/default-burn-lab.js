@@ -45,7 +45,37 @@ describe("ERC8060 - burn fallback after loan default", function () {
       TOKEN, lender.address, DEBT, ETH, now + 600, DURATION
     );
 
+    // Separate informed on-chain consent before the lender funds the loan.
+    await vault.authorizeBurnFallback(0);
     await vault.connect(lender).fundLoan(0, { value: DEBT });
+  });
+
+  it("rejects burn on default when the borrower never consented to burn fallback", async function () {
+    const otherNft = await (await ethers.getContractFactory("ERC8060BackedNFTLab")).deploy();
+    await otherNft.deployed();
+    await otherNft.mint({ value: ETH });
+    const otherVault = await (await ethers.getContractFactory("ERC8060DefaultBurnLab")).deploy(otherNft.address);
+    await otherVault.deployed();
+    await otherNft.approve(otherVault.address, TOKEN);
+    const now = (await ethers.provider.getBlock("latest")).timestamp;
+    await otherVault.openLoan(TOKEN, lender.address, DEBT, ETH, now + 600, DURATION);
+    expect(await otherVault.burnFallbackAuthorized(0)).to.equal(false);
+    await otherVault.connect(lender).fundLoan(0, { value: DEBT });
+    await matureAndFinishGrace();
+    await rejects(otherVault.burnDefaultedNFT(0));
+    expect(await otherNft.ownerOf(TOKEN)).to.equal(otherVault.address);
+    await rejects(otherVault.authorizeBurnFallback(0)); // too late after funding
+    expect(await otherNft.ownerOf(TOKEN)).to.equal(otherVault.address);
+  });
+
+  it("explicit borrower consent is required, independent of NFT transfer approval", async function () {
+    const loan = await vault.loans(0);
+    expect(await vault.burnFallbackAuthorized(0)).to.equal(true);
+    await rejects(vault.connect(stranger).authorizeBurnFallback(0));
+    await matureAndFinishGrace();
+    // Authorization was given before funding, so the burn fallback is valid.
+    expect(loan.borrower).to.equal(borrower.address);
+    await vault.burnDefaultedNFT(0);
   });
 
   async function matureAndFinishGrace() {

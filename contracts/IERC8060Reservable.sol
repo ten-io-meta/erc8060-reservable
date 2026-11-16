@@ -63,8 +63,8 @@ interface IERC8060Reservable {
         address asset
     ) external view returns (uint256);
 
-    /// @notice Returns value currently withdrawable by the owner.
-    /// @dev Must equal totalValue(tokenId, asset) - lockedValue(tokenId, asset).
+    /// @notice Returns unreserved accounted value, not guaranteed immediately redeemable ETH.
+    /// @dev Must equal accountedTotal(tokenId, asset) - lockedValue(tokenId, asset).
     function availableValue(
         uint256 tokenId,
         address asset
@@ -77,9 +77,9 @@ interface IERC8060Reservable {
  * Any correct implementation MUST maintain these invariants.
  * Violations MUST cause reverts in the relevant functions.
  *
- * 1. lockedValue(tokenId, asset) <= totalValue(tokenId, asset)
+ * 1. lockedValue(tokenId, asset) <= accountedTotal(tokenId, asset)
  *
- * 2. availableValue(tokenId, asset) == totalValue(tokenId, asset) - lockedValue(tokenId, asset)
+ * 2. availableValue(tokenId, asset) == accountedTotal(tokenId, asset) - lockedValue(tokenId, asset)
  *
  * 3. Any operation that reduces the token's custodied balance for an asset
  *    (withdraw, burn, or internal value movement) MUST revert if
@@ -100,8 +100,8 @@ interface IERC8060Reservable {
  * Implementation Requirements
  *
  * - The contract MUST enforce Invariant 3 inside its withdraw/burn logic.
- * - totalValue(tokenId, asset) is expected to be provided by the base
- *   ERC-8060 implementation or equivalent accounting.
+ * - accountedTotal(tokenId, asset) is conceptual accounting, NOT a function
+ *   required by ERC-8060. Each implementation documents its own total.
  */
 
 /**

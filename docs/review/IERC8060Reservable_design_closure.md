@@ -93,3 +93,13 @@ For an opt-in loan that custodies an ERC-8060 NFT as collateral, an application 
 ## 8. Final decision
 
 **Freeze `IERC8060Reservable`'s ABI without adding `forceRelease`, `spendReservedValue`, `liquidate`, `deadline`, `slash` or reputation functions.** The invariant/accounting layer is sufficiently delimited for a design candidate. Market guarantees, enforceable claims, recoverability, and redemption profiles are separate opt-in application/profile responsibilities. This is a specification closure decision, **not** a production release, approved ERC status, or security certification.
+
+## 9. Subsequent security hardening (experimental branch)
+
+After the design closure, the three accounting-only example contracts were restricted so only the NFT owner can create new example commitments and only the recorded creator can release those commitments. The misleading `settleEscrow` and `settleTaskBond` paths now revert; no payout is simulated and no reservation is abandoned by a false settlement. `MinimalLendingCollateral.closeLoan` remains **only** a demo release by its recorded borrower; it is *not* a funded debt or a claim that repayment occurred. For an actual funded loan, see the separately modeled `ReservableRepaymentLoanDemo`, subject to its own review and limitations.
+
+The default-by-burn laboratory now has a dedicated `authorizeBurnFallback` consent action by the borrower while the loan is unfunded, separate from authorizing NFT custody. This is an experimental opt-in only; it does not prove enforceability, fair-market valuation or safe production liquidation.
+
+The legacy negative tests were changed to expect unauthorized operations and false settlement to revert. Earlier `135 passing` results refer to the pre-hardening commit `acf39f6`. Final test counts must come from the Hardhat suite for the hardened commit, and CI must pass before merging.
+
+**Remaining limits:** No production audit, no formal verification, no general-purpose beneficiary settlement, no independent proof of solvency and no automatic liquidation right under `IERC8060Reservable`. The six-function interface remains unchanged.

@@ -6,6 +6,23 @@ The extension allows authorized spenders to reserve portions of a token's underl
 
 **Status:** Draft
 
+## Security and demonstration scope
+
+**WARNING — EXPERIMENTAL / NOT AUDITED.** Reservation accounting does not provide settlement, payments, dispute resolution, or liquidation rights. The three minimal application examples (`MinimalReservableEscrow`, `AgentTaskBond`, `MinimalLendingCollateral`) are **accounting-only demos**, not financially enforceable escrow, task-payment, or lending contracts.
+
+The hardened examples require the current NFT owner to create commitments and restrict release to the originating party. `settleEscrow` and `settleTaskBond` deliberately revert rather than falsely claim payment or strand a lock. `closeLoan` is merely a demo release and does not represent debt repayment. For terms, verifier authorization, payments, or real collateral custody, assess the separately named demonstration contracts and their limits individually.
+
+Some tests deliberately illustrate unsafe alternatives (such as `buyNaive`). A passing negative demonstration means the risk was reproduced, **not** that the example is secure. No example is recommended for deployment with real funds.
+
+For strict ERC-8060, a token's reported `valueOf()` must be redeemable on burn. A reservation-blocked conditional profile must **not** advertise the strict ERC-8060 interface. The separate design-closure document explains the distinction.
+
+### How to run the tests
+
+```bash
+npm ci
+npm test
+```
+
 ## Live Demo
 
 https://ten-io-meta.github.io/erc8060-reservable/demo/
@@ -18,7 +35,7 @@ Interactive demonstration of:
 - multi-application coexistence
 - availableValue vs lockedValue
 
-Current repository status: 135 passing tests.
+Historical baseline (commit `acf39f6`): **135 local Hardhat tests passed**, including tests that deliberately demonstrated insecure contract behavior. This number is not a security certification; execute `npm test` and review CI for the current branch.
 
 Reference implementation, test suite, escrow example, lending example, timed escrow example, and agent bond example included in this repository.
 
@@ -43,7 +60,7 @@ The resulting design maintains a strict separation of concerns:
 
 | Layer                              | Responsibility                        |
 | ---------------------------------- | ------------------------------------- |
-| ERC-8060                           | Value custody and redemption rules        |
+| ERC-8060                           | Value custody and redemption rules    |
 | IERC8060Reservable                 | Reservation accounting                |
 | Escrows / Applications             | Settlement, execution, and conditions |
 | Reputation Systems (e.g. ERC-8004) | Identity, trust, and discoverability  |
@@ -86,10 +103,9 @@ Demonstrate that value can be committed without transferring ownership or custod
 2. Escrow reserves value using `reserveValue()`.
 3. NFT ownership remains unchanged.
 4. Reserved value cannot be withdrawn.
-5. Escrow either:
+5. The authorized creator can release the reservation.
 
-   * releases the reservation
-   * settles according to external application logic
+This minimal example does **not** execute settlement or payout: `settleEscrow()` deliberately reverts. Settlement must be implemented by a separate application with its own beneficiary, payment and dispute rules.
 
 ### Properties Demonstrated
 
@@ -118,7 +134,7 @@ Demonstrate that value can be committed to an agent task without transferring ow
 * Multiple concurrent bonds
 * Reservation accumulation
 * Independent bond release
-* Independent bond settlement
+* Explicit rejection of unsupported bond settlement
 * Invalid state protection
 * Allowance enforcement
 * Available value enforcement
@@ -175,7 +191,7 @@ Properties demonstrated:
 * Multiple concurrent bonds
 * Reservation accumulation
 * Independent bond release
-* Independent bond settlement
+* Explicit rejection of unsupported bond settlement
 * Invalid state protection
 * Allowance enforcement
 * Available value enforcement
@@ -240,7 +256,7 @@ Current test suite validates:
 * Agent bond coexistence
 * Lending coexistence
 * Independent release paths
-* Independent settlement paths
+* Independent reservations and release paths; actual settlement requires external application logic
 
 ### Multi-Asset Validation
 
@@ -258,7 +274,7 @@ Current test suite validates:
 * Expired escrow recovery
 * Recovery without modifying IERC8060Reservable
 
-**Current repository status: 135 passing tests.**
+**Latest validated hardening commit (`d466523`): 137 passing Hardhat tests, 0 failures** ([GitHub Actions](https://github.com/ten-io-meta/erc8060-reservable/actions/runs/43783440784)). The historical baseline (`acf39f6`) had 135 passing tests, including demonstrations of unsafe behavior. Passing tests do not constitute a security audit.
 
 ---
 
@@ -270,6 +286,7 @@ IERC8060Reservable accounts for reserved, locked, and available value. It does n
 Redemption behavior remains governed by the underlying value-bearing NFT implementation and its applicable constraints. Active reservations may restrict the amount of value available for redemption.
 
 The `totalValue` identifier used in examples or disclosures must not be interpreted as a mandatory ERC-8060 interface function unless separately defined by the relevant implementation.
+
 ## Security Considerations
 
 ### Dead Reservations
