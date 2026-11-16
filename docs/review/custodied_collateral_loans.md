@@ -22,8 +22,8 @@ The lender agrees to precisely the stored offer by calling `fund(loanId, expecte
 | Active | Anyone can pay toward exact fixed payoff until end of grace | Real ETH collected, and equal creditor pull-credit recorded |
 | Repaid | Borrower can reclaim NFT to chosen address | Original NFT returned; lender may withdraw credits |
 | Defaulted | Anyone can mark overdue loan after grace | NFT still custodied; no automatic release to debtor |
-| Disputed | Either party can challenge within finite window | NFT held; authorized arbiter may rule within finite period |
-| Forgiven | Named arbiter confirms offchain satisfaction or forgiveness | NFT can be returned; previously recorded lender credits stay intact |
+| Disputed | Either party can challenge within finite window | NFT held; anyone can settle the full outstanding amount with real ETH; arbiter may fund full settlement or uphold default after challenge |
+| Forgiven | **Only the named lender** voluntarily waives unpaid debt | NFT can be returned; existing lender credits remain withdrawable |
 | Liquidated | After challenge expiry or by arbiter, or after arbiter timeout | NFT burned; exact ETH received verified; lender gets **only unpaid payoff**, borrower the remaining ETH |
 | NFTReturned / Cancelled | Terminal | No second collateral return or second liquidation |
 
@@ -31,10 +31,10 @@ The lender agrees to precisely the stored offer by calling `fund(loanId, expecte
 
 ## Deliberate trade-offs / unresolved questions
 
-1. **Pre-agreed trusted arbitration.** The named arbiter can forgive remaining debt without an onchain ETH payment and permit the borrower to recover the NFT. That can disadvantage a lender if the arbiter lies or colludes; there is no trustless way to establish disputed offchain repayment. The parties must agree to that trust model up front. If the arbiter is unresponsive, the immutable fallback is **default liquidation**, not debt forgiveness.
+1. **Arbitration without unsecured forgiveness.** The named arbiter is no longer allowed to forgive a lender's outstanding claim without payment. In a dispute, it can settle only by depositing the **exact unpaid ETH**, which becomes the lender's credit, or uphold default for collateral liquidation **after the challenge period**. Only the actual lender can call `lenderWaive` to voluntarily acknowledge offchain payment/forgive their remaining claim. Anyone can cure `Defaulted` or `Disputed` by paying the full remaining ETH onchain before liquidation. If the arbiter disappears, the immutable fallback remains default liquidation after the dispute timeout. A compromised lender account can still waive its own claim; a compromised arbiter can still accelerate liquidation after challenge expiry. No mechanism can truthlessly establish an offchain payment without outside evidence and a trust rule.
 2. **No fair market sale.** Burning the NFT eliminates secondary market value above its native ETH floor. A more sophisticated lending product may require an auction, reserve prices, oracle or alternative sale mechanism and further borrower protections. This prototype deliberately implements *only* deterministic ETH redemption with a fixed payoff.
 3. **No legal enforceability or outside asset verification.** This code recognizes actual ETH transactions inside the application, not cash, bank transfers, courts or offchain delivery. `termsHash` commits to bytes but does not validate their meaning.
-4. **Deadline and automation.** Default, arbitration and liquidation are permissionless calls where stated but do not occur automatically; someone must submit a transaction. Timestamp boundaries have the usual execution-block sequencing limits.
+4. **Deadline and automation.** Default and liquidation are permissionless only where stated but do not happen automatically; someone must submit a transaction. Arbitration is restricted to the agreed named arbiter. The fixed challenge window precedes any arbiter-triggered liquidation. Onchain full debt settlement and default liquidation can race; whichever valid transaction executes first determines the outcome. Timestamp boundaries have the usual execution-block sequencing limits.
 5. **Underlying collection trust.** Accept only the specific strict reference NFT code reviewed and deployed by a trusted operator. `supportsInterface` or `valueOf` cannot prove solvency on their own. If a token misreports payout, the checked burn reverts without assigning false credits. Upgrades to the NFT would require additional scrutiny.
 6. **Recovery limits.** A user who loses their borrower key may be unable to cancel or reclaim, even though debt resolution can proceed permissionlessly. The design cannot guarantee recovery against lost keys and simultaneously forbid other parties from taking their NFT; pre-agreed contract-wallet recovery or signature delegation would be separate audited mechanisms.
 7. **Rescue of unexpected donations.** Extra ETH deliberately forced into the escrow remains uncredited. There is no admin withdrawal, so unsolicited ETH may become stranded. This avoids allowing operators to skim pledged/credited money at the cost of recoverability.
@@ -42,7 +42,22 @@ The lender agrees to precisely the stored offer by calling `fund(loanId, expecte
 
 ## Tests
 
-- `test/custodied-collateral-loan.js`: funding, debt ledger, partial and full payments, unauthorized acts, reclaim, onchain default, challenge, arbitration, timeout and pull-credit behavior.
-- `test-foundry/CustodiedCollateralLoan.t.sol`: varied amounts, partial payments and exact ETH balance invariants for loan liquidation and repayment.
+- `test/custodied-collateral-loan.js`: funding, debt ledger, partial and full payments, unauthorized acts, reclaim, onchain default, challenge, funded arbitration, creditor-only waiver, default cure, timeout and pull-credit behavior.
+- `test-foundry/CustodiedCollateralLoan.t.sol`: varied amounts, partial payments, creditor-only waivers, fully ETH-funded dispute settlement, default cures and exact ETH balance invariants.
 
 For running against local EVMs only: `npm test` and `forge test --match-path 'test-foundry/*.t.sol' -vv`. No Mainnet RPC or private keys are needed.
+
+## Security correction after external adversarial review — November 2026
+
+The prior prototype permitted `arbiter.arbitrate(loanId, true)` to forgive an unpaid onchain debt at **zero ETH**. This was an explicit trust shortcut, but it allowed a compromised or colluding arbiter to deprive the lender of remaining payoff while releasing the NFT. The external review identified this as the primary high-severity economic risk.
+
+This version removes **unilateral, unpaid arbiter forgiveness**. Its settlement and waiver pathways are distinct:
+
+- `arbitrate(id, true)` requires `msg.value == payoff - repaid`, credits that exact ETH to the lender, and marks the loan fully paid. Arbiter cannot access NFT or creditor credits. `arbitrate(id, false)` is liquidation with **no payment supplied** and only after the agreed challenge window.
+- `settleAfterDefault(id)` requires the exact same outstanding ETH and can be funded by any address before a successful liquidation (no duplicate recovery).
+- `lenderWaive(id)` is an express decision **signed as a transaction by the actual named lender**, who alone can voluntarily release its unpaid rights; an arbiter or borrower cannot impersonate this authorization.
+- The code does not try to infer settlement from a hash, an unchallenged assertion, or a posted bond. Such mechanisms are not proof of offchain payment without objective verification and an explicit trust model.
+
+**Still unsolved:** liquidation always burns the NFT for its embedded ETH, potentially destroying a large secondary-market premium. No onchain mechanism can infer or guarantee the NFT's market price here. Production support for premium collateral would require a separately opted-in and audited auction/sale route with atomic protections, rather than treating an NFT's floor backing as its full market value. The exact collateral NFT bytecode and backing accounting must also be independently examined, because `valueOf` alone does not certify solvency.
+
+No independent professional security audit has been conducted. This change is a research correction, not evidence of production readiness.
