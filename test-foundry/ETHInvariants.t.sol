@@ -5,8 +5,8 @@ import "forge-std/Test.sol";
 import "forge-std/StdInvariant.sol";
 import "forge-std/Vm.sol";
 
-import "../contracts/vault/ERC8060NativeETHReference.sol";
-import "../contracts/vault/ReservableConditionalETHReference.sol";
+import "../contracts/reference/ERC8060NativeETHReference.sol";
+import "../contracts/reference/ReservableConditionalETHReference.sol";
 
 /// @notice Ghost ledgers are maintained by independent fuzz handlers, not
 ///         derived from the contracts under test.
