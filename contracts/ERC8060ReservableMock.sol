@@ -5,6 +5,8 @@ pragma solidity ^0.8.20;
 import "./IERC8060Reservable.sol";
 
 contract ERC8060ReservableMock is IERC8060Reservable {
+    // Laboratory administration only; this mock is not a production ERC-721.
+    address private immutable _labMinter;
     mapping(uint256 => address) private _owners;
     mapping(uint256 => mapping(address => uint256)) private _totalValue;
     mapping(uint256 => mapping(address => uint256)) private _lockedValue;
@@ -22,6 +24,7 @@ contract ERC8060ReservableMock is IERC8060Reservable {
         private _reservations;
 
     constructor() {
+        _labMinter = msg.sender;
         _owners[1] = msg.sender;
     }
 
@@ -31,6 +34,8 @@ contract ERC8060ReservableMock is IERC8060Reservable {
     }
 
     function mintToken(uint256 tokenId, address to) external {
+        require(msg.sender == _labMinter, "not lab minter");
+        require(to != address(0), "zero recipient");
         require(_owners[tokenId] == address(0), "already minted");
         _owners[tokenId] = to;
     }
@@ -61,6 +66,7 @@ contract ERC8060ReservableMock is IERC8060Reservable {
     ) external {
         require(_owners[tokenId] == from, "wrong owner");
         require(msg.sender == from, "not authorized");
+        require(to != address(0), "zero recipient");
 
         _clearUnusedReserveAllowances(tokenId);
 

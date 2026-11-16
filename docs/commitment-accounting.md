@@ -2,7 +2,7 @@
 
 ## Motivation
 
-ERC-8060 introduces value-bearing NFTs through `totalValue()`.
+ERC-8060 introduces value-bearing NFTs through `valueOf(tokenId)` and an ETH redemption operation (`burn`). `totalValue(tokenId, asset)` is an implementation-specific accounting helper in this laboratory, **not** a mandatory ERC-8060 function.
 
 However, many real-world applications require value to be committed without:
 
