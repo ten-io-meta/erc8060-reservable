@@ -45,7 +45,20 @@ describe("ERC8060 - burn fallback after loan default", function () {
       TOKEN, lender.address, DEBT, ETH, now + 600, DURATION
     );
 
+    // Separate informed on-chain consent before the lender funds the loan.
+    await vault.authorizeBurnFallback(0);
     await vault.connect(lender).fundLoan(0, { value: DEBT });
+  });
+
+  it("explicit borrower consent is required, independent of NFT transfer approval", async function () {
+    const loan = await vault.loans(0);
+    expect(await vault.burnFallbackAuthorized(0)).to.equal(true);
+    await expect(vault.connect(stranger).authorizeBurnFallback(0))
+      .to.be.revertedWith("authorization before funding only");
+    await matureAndFinishGrace();
+    // Authorization was given before funding, so the burn fallback is valid.
+    expect(loan.borrower).to.equal(borrower.address);
+    await vault.burnDefaultedNFT(0);
   });
 
   async function matureAndFinishGrace() {
