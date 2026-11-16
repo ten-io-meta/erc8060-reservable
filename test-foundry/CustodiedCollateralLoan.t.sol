@@ -95,8 +95,16 @@ contract CustodiedCollateralLoanFoundryTest is Test {
 
         vm.prank(LENDER);
         loan.withdrawCredit(payable(LENDER));
-        vm.prank(BORROWER);
-        loan.withdrawCredit(payable(BORROWER));
+        uint256 borrowerShare = backing - (payoff - paid);
+        if (borrowerShare > 0) {
+            vm.prank(BORROWER);
+            loan.withdrawCredit(payable(BORROWER));
+        } else {
+            assertEq(loan.credits(BORROWER), 0, "no invented borrower surplus");
+            vm.expectRevert(bytes("no credit"));
+            vm.prank(BORROWER);
+            loan.withdrawCredit(payable(BORROWER));
+        }
 
         assertEq(address(loan).balance, 0, "all creditor and borrower payouts possible");
         assertEq(loan.totalCredits(), 0, "credits exhausted");
