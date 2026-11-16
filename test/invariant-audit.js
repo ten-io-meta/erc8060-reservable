@@ -75,17 +75,22 @@ describe("Reservable — invariant audit", function () {
     for (const t of tokens) for (const asset of assets) {
       model[key(t, asset)] = { total: (await mock.totalValue(t,asset)).toNumber(), locked: [0,0], approvals: [0,0] };
     }
-    // Fixed arithmetic sequence, reproducible in CI.
+    // Each eight-step round visits all token/asset/spender combinations.
+    // Every combination receives approvals, reservations, releases and renewals.
     for (let i = 0; i < 64; i++) {
-      const t = tokens[i % 2], asset = assets[Math.floor(i / 2) % 2], who = i % 4 < 2 ? 0 : 1;
+      const slot = i % 8;
+      const round = Math.floor(i / 8);
+      const t = tokens[slot % 2];
+      const asset = assets[Math.floor(slot / 2) % 2];
+      const who = Math.floor(slot / 4);
       const item = model[key(t, asset)], actor = spenders[who];
-      if (i % 8 === 0) {
-        const approval = 250 + (i % 5) * 30;
-        await mock.approveReserve(t,actor.address,asset,approval);
+      if (round === 0 || round === 4) {
+        const approval = 250 + slot * 5;
+        await mock.approveReserve(t, actor.address, asset, approval);
         item.approvals[who] = approval;
-      } else if (i % 3 === 0 && item.locked[who] > 0) {
+      } else if ((round === 3 || round === 6) && item.locked[who] > 0) {
         const amount = Math.min(item.locked[who], 17);
-        await mock.connect(actor).releaseValue(t,asset,amount);
+        await mock.connect(actor).releaseValue(t, asset, amount);
         item.locked[who] -= amount;
       } else {
         const outstanding = item.locked.reduce((x,y)=>x+y,0);
