@@ -6,6 +6,23 @@ The extension allows authorized spenders to reserve portions of a token's underl
 
 **Status:** Draft
 
+## Security and demonstration scope
+
+**WARNING — EXPERIMENTAL / NOT AUDITED.** Reservation accounting does not provide settlement, payments, dispute resolution, or liquidation rights. The three minimal application examples (`MinimalReservableEscrow`, `AgentTaskBond`, `MinimalLendingCollateral`) are **accounting-only demos**, not financially enforceable escrow, task-payment, or lending contracts.
+
+The hardened examples require the current NFT owner to create commitments and restrict release to the originating party. `settleEscrow` and `settleTaskBond` deliberately revert rather than falsely claim payment or strand a lock. `closeLoan` is merely a demo release and does not represent debt repayment. For terms, verifier authorization, payments, or real collateral custody, assess the separately named demonstration contracts and their limits individually.
+
+Some tests deliberately illustrate unsafe alternatives (such as `buyNaive`). A passing negative demonstration means the risk was reproduced, **not** that the example is secure. No example is recommended for deployment with real funds.
+
+For strict ERC-8060, a token's reported `valueOf()` must be redeemable on burn. A reservation-blocked conditional profile must **not** advertise the strict ERC-8060 interface. The separate design-closure document explains the distinction.
+
+### How to run the tests
+
+```bash
+npm ci
+npm test
+```
+
 ## Live Demo
 
 https://ten-io-meta.github.io/erc8060-reservable/demo/
@@ -18,7 +35,7 @@ Interactive demonstration of:
 - multi-application coexistence
 - availableValue vs lockedValue
 
-Current repository status: 135 passing tests.
+Historical baseline (commit `acf39f6`): **135 local Hardhat tests passed**, including tests that deliberately demonstrated insecure contract behavior. This number is not a security certification; execute `npm test` and review CI for the current branch.
 
 Reference implementation, test suite, escrow example, lending example, timed escrow example, and agent bond example included in this repository.
 
@@ -43,7 +60,7 @@ The resulting design maintains a strict separation of concerns:
 
 | Layer                              | Responsibility                        |
 | ---------------------------------- | ------------------------------------- |
-| ERC-8060                           | Value custody and redemption rules        |
+| ERC-8060                           | Value custody and redemption rules    |
 | IERC8060Reservable                 | Reservation accounting                |
 | Escrows / Applications             | Settlement, execution, and conditions |
 | Reputation Systems (e.g. ERC-8004) | Identity, trust, and discoverability  |
@@ -258,7 +275,7 @@ Current test suite validates:
 * Expired escrow recovery
 * Recovery without modifying IERC8060Reservable
 
-**Current repository status: 135 passing tests.**
+**Historical baseline (commit `acf39f6`): **135 local Hardhat tests passed**, including tests that deliberately demonstrated insecure contract behavior. This number is not a security certification; execute `npm test` and review CI for the current branch.**
 
 ---
 
@@ -270,6 +287,7 @@ IERC8060Reservable accounts for reserved, locked, and available value. It does n
 Redemption behavior remains governed by the underlying value-bearing NFT implementation and its applicable constraints. Active reservations may restrict the amount of value available for redemption.
 
 The `totalValue` identifier used in examples or disclosures must not be interpreted as a mandatory ERC-8060 interface function unless separately defined by the relevant implementation.
+
 ## Security Considerations
 
 ### Dead Reservations
