@@ -126,7 +126,7 @@ contract EconomicCompositionV1Test is Test {
         vm.warp(uint256(loanDeadline) + 1);
         _assertAccounting(1.6 ether, 0.4 ether);
         assertEq(appB.lenderCredits(lender), 0, "no ETH credited at default");
-        (, , , , , , , bool funded, bool repaid, bool cancelled) = appB.loans(loanId);
+        (, , , , , , bool funded, bool repaid, bool cancelled) = appB.loans(loanId);
         assertTrue(funded && !repaid && !cancelled, "loan still outstanding");
 
         vm.startPrank(lender);
