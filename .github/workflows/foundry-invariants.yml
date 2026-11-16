@@ -31,8 +31,12 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: stable
-      - name: Install forge-std test dependency (CI only)
-        run: git clone --depth 1 --recurse-submodules https://github.com/foundry-rs/forge-std.git lib/forge-std
+      - name: Install pinned forge-std test dependency (CI only)
+        run: |
+          git clone --depth 1 --no-checkout https://github.com/foundry-rs/forge-std.git lib/forge-std
+          git -C lib/forge-std fetch --depth 1 origin 15b2df92a05d4d2f76a06653872fefb287e0e01c
+          git -C lib/forge-std checkout --detach 15b2df92a05d4d2f76a06653872fefb287e0e01c
+          git -C lib/forge-std submodule update --init --recursive --depth 1
       - name: Compile and fuzz model-based economic invariants
         env:
           FOUNDRY_PROFILE: ci
