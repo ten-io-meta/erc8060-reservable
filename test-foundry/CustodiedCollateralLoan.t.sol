@@ -179,4 +179,26 @@ contract CustodiedCollateralLoanFoundryTest is Test {
         assertEq(collateral.ownerOf(1), BORROWER);
         assertEq(address(loan).balance, 0);
     }
+    function test_ExactRedemptionFloorLeavesNoFakeBorrowerCredit() public {
+        uint256 id = _propose(1, 1, 1);
+        _fund(id, 1);
+        vm.warp(block.timestamp + 4 days);
+        loan.declareDefault(id);
+        vm.warp(block.timestamp + 2 days);
+        loan.liquidate(id);
+
+        assertEq(loan.credits(LENDER), 1);
+        assertEq(loan.credits(BORROWER), 0, "zero surplus means no credit");
+        assertEq(loan.totalCredits(), 1);
+        assertTrue(loan.isCreditSolvent());
+        vm.expectRevert(bytes("no credit"));
+        vm.prank(BORROWER);
+        loan.withdrawCredit(payable(BORROWER));
+
+        vm.prank(LENDER);
+        loan.withdrawCredit(payable(LENDER));
+        assertEq(address(loan).balance, 0);
+        assertEq(loan.totalCredits(), 0);
+    }
+
 }
