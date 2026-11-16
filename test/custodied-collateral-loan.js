@@ -233,4 +233,45 @@ describe("CustodiedCollateralLoanPoC — money movement and creditor/borrower sa
     eq(await escrow.totalCredits(), ethers.constants.Zero);
   });
 
+  it("two simultaneous borrowers cannot cross-claim each other's collateral or surplus", async function () {
+    await propose(); await fund(); // token 1: borrower, 2 ETH backing, 1.1 ETH payoff
+
+    await collateral.connect(stranger).mint({ value: ETH("3") });
+    await collateral.connect(stranger).approve(escrow.address, 2);
+    const now = (await ethers.provider.getBlock("latest")).timestamp;
+    const second = {
+      tokenId: 2, lender: lender.address, arbiter: arbiter.address,
+      principal: ETH("0.5"), payoff: ETH("0.55"),
+      fundingDeadline: now + 1000, term: 200, grace: 100,
+      challenge: 120, arbitrateFor: 120, termsHash: TERMS
+    };
+    await escrow.connect(stranger).propose(second);
+    await escrow.connect(lender).fund(2, TERMS, { value: ETH("0.5") });
+    await escrow.connect(borrower).repay(1, { value: ETH("0.1") });
+    await escrow.connect(stranger).repay(2, { value: ETH("0.2") });
+
+    const l2 = await escrow.loanInfo(2);
+    await warpAt(l2.dueAt.toNumber() + l2.grace.toNumber() + 1);
+    await escrow.declareDefault(1);
+    await escrow.declareDefault(2);
+    const final = await escrow.loanInfo(2);
+    await warpAt(final.defaultAt.toNumber() + final.challenge.toNumber() + 1);
+    await escrow.liquidate(2);
+    await escrow.liquidate(1);
+
+    eq(await escrow.credits(lender.address), ETH("1.65"));
+    eq(await escrow.credits(borrower.address), ETH("1.0"));
+    eq(await escrow.credits(stranger.address), ETH("2.65"));
+    eq(await escrow.totalCredits(), ETH("5.3"));
+    eq(await ethers.provider.getBalance(escrow.address), ETH("5.3"));
+    expect(await escrow.isCreditSolvent()).to.equal(true);
+    await escrow.connect(borrower).withdrawCredit(borrower.address);
+    eq(await escrow.credits(stranger.address), ETH("2.65"));
+    eq(await escrow.totalCredits(), ETH("4.3"));
+    await escrow.connect(lender).withdrawCredit(lender.address);
+    await escrow.connect(stranger).withdrawCredit(stranger.address);
+    eq(await escrow.totalCredits(), ethers.constants.Zero);
+    eq(await ethers.provider.getBalance(escrow.address), ethers.constants.Zero);
+  });
+
 });
