@@ -18,7 +18,7 @@ Interactive demonstration of:
 - multi-application coexistence
 - availableValue vs lockedValue
 
-Current repository status: 61 passing tests.
+Current repository status: 135 passing tests.
 
 Reference implementation, test suite, escrow example, lending example, timed escrow example, and agent bond example included in this repository.
 
@@ -43,7 +43,7 @@ The resulting design maintains a strict separation of concerns:
 
 | Layer                              | Responsibility                        |
 | ---------------------------------- | ------------------------------------- |
-| ERC-8060                           | Value custody and `totalValue`        |
+| ERC-8060                           | Value custody and redemption rules        |
 | IERC8060Reservable                 | Reservation accounting                |
 | Escrows / Applications             | Settlement, execution, and conditions |
 | Reputation Systems (e.g. ERC-8004) | Identity, trust, and discoverability  |
@@ -51,6 +51,7 @@ The resulting design maintains a strict separation of concerns:
 
 `IERC8060Reservable` standardizes only:
 
+* `approveReserve`
 * `reserveAllowance`
 * `reserveValue`
 * `releaseValue`
@@ -257,10 +258,18 @@ Current test suite validates:
 * Expired escrow recovery
 * Recovery without modifying IERC8060Reservable
 
-**Current repository status: 61 passing tests.**
+**Current repository status: 135 passing tests.**
 
 ---
 
+
+### Reservation and Redemption Boundaries
+
+IERC8060Reservable accounts for reserved, locked, and available value. It does not independently guarantee immediate redemption of reserved value.
+
+Redemption behavior remains governed by the underlying value-bearing NFT implementation and its applicable constraints. Active reservations may restrict the amount of value available for redemption.
+
+The `totalValue` identifier used in examples or disclosures must not be interpreted as a mandatory ERC-8060 interface function unless separately defined by the relevant implementation.
 ## Security Considerations
 
 ### Dead Reservations
