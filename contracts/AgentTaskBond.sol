@@ -10,6 +10,11 @@ import "./IERC8060Reservable.sol";
  *      It only demonstrates that value can be committed for an agent task
  *      without transferring ownership or custody of the NFT.
  */
+interface ITaskBondOwner {
+    function ownerOf(uint256 tokenId) external view returns (address);
+}
+
+/// @notice ACCOUNTING-ONLY DEMO; no task verification or agent payout.
 contract AgentTaskBond {
     IERC8060Reservable public immutable reservable;
 
@@ -25,6 +30,7 @@ contract AgentTaskBond {
 
     uint256 public nextBondId;
     mapping(uint256 => Bond) public bonds;
+    mapping(uint256 => address) public creators;
 
     event TaskBondCreated(
         uint256 indexed bondId,
@@ -50,6 +56,7 @@ contract AgentTaskBond {
         address agent,
         bytes32 taskHash
     ) external returns (uint256 bondId) {
+        require(ITaskBondOwner(address(reservable)).ownerOf(tokenId) == msg.sender, "not NFT owner");
         require(agent != address(0), "invalid agent");
         require(amount > 0, "amount is zero");
         require(taskHash != bytes32(0), "empty task hash");
@@ -58,6 +65,7 @@ contract AgentTaskBond {
 
         bondId = nextBondId++;
 
+        creators[bondId] = msg.sender;
         bonds[bondId] = Bond({
             tokenId: tokenId,
             asset: asset,
@@ -83,6 +91,7 @@ contract AgentTaskBond {
 
         require(b.active, "bond not active");
         require(!b.settled, "bond already settled");
+        require(msg.sender == creators[bondId], "not bond creator");
 
         b.active = false;
 
@@ -91,20 +100,8 @@ contract AgentTaskBond {
         emit TaskBondReleased(bondId);
     }
 
-    function settleTaskBond(uint256 bondId) external {
-        Bond storage b = bonds[bondId];
-
-        require(b.active, "bond not active");
-        require(!b.settled, "bond already settled");
-
-        b.active = false;
-        b.settled = true;
-
-        // Demo only:
-        // IERC8060Reservable deliberately does not define settlement.
-        // A real application would connect this to external validation,
-        // payment execution, slashing, reputation, ERC-8004, ERC-8281, etc.
-
-        emit TaskBondSettled(bondId);
+    /// @notice No settlement without a verified task result and payment logic.
+    function settleTaskBond(uint256) external pure {
+        revert("settlement not implemented");
     }
 }
