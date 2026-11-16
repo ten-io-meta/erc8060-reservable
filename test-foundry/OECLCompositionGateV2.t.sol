@@ -16,7 +16,14 @@ contract OECLCompositionGateV2Test is Test {
     address internal stranger = address(0xBAD);
 
     function setUp() public {
-        gate = new OECLCompositionGate();
+        OECLCanonicalAssetFactory assets = new OECLCanonicalAssetFactory();
+        OECLAccountingAppFactory accounting = new OECLAccountingAppFactory(address(assets));
+        OECLRecoveryAppFactory recovery = new OECLRecoveryAppFactory(address(assets));
+        gate = new OECLCompositionGate(address(assets), address(accounting), address(recovery));
+        assertLe(address(gate).code.length, 24576, "gate runtime exceeds EIP-170");
+        assertLe(address(assets).code.length, 24576, "asset factory runtime exceeds EIP-170");
+        assertLe(address(accounting).code.length, 24576, "accounting factory runtime exceeds EIP-170");
+        assertLe(address(recovery).code.length, 24576, "recovery factory runtime exceeds EIP-170");
         vm.deal(borrower, 20 ether);
         vm.deal(lender, 20 ether);
         vm.deal(stranger, 20 ether);
