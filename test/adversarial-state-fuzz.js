@@ -190,7 +190,7 @@ describe("Break the combined reference — seeded adversarial state machines", f
           await revert(reserved.connect(spender).releaseValue(t.id, ETH, r.locked + 1),
             "release exceeds allocation");
         }
-        await check(seed + ":" + step + ":op" + op, t);
+        await check(step, t);
       }
 
       // A cooperative spender can release all locks; then every owner can
@@ -205,7 +205,7 @@ describe("Break the combined reference — seeded adversarial state machines", f
         await netReceived(owners[t.owner],
           () => reserved.connect(owners[t.owner]).redeemWhenUnlocked(t.id), t.amount);
         t.live = false;
-        await check(seed + ":final-" + t.id, t);
+        await check(140, t);
       }
       equals(await ethers.provider.getBalance(reserved.address), 0, "no stranded ETH");
     });
