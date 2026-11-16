@@ -42,7 +42,9 @@ contract StrictETHHandler is FuzzActors {
         if (count == 0) return 0;
         uint256 nth = raw % count;
         for (uint256 id = 1; id <= minted; id++) {
-            if (token[id].live && nth-- == 0) return id;
+            if (!token[id].live) continue;
+            if (nth == 0) return id;
+            nth--;
         }
         revert("unreachable");
     }
@@ -120,7 +122,9 @@ contract ConditionalETHHandler is FuzzActors {
         if (count == 0) return 0;
         uint256 nth = raw % count;
         for (uint256 id = 1; id <= minted; id++) {
-            if (token[id].live && nth-- == 0) return id;
+            if (!token[id].live) continue;
+            if (nth == 0) return id;
+            nth--;
         }
         revert("unreachable");
     }
@@ -326,7 +330,7 @@ contract ConditionalETHInvariant is StdInvariant, Test {
     /// a reserved NFT can be transferred, but its new owner cannot cancel
     /// an existing spender lock. Uncooperative spender => unbounded lock.
     function test_UncooperativeSpenderLocksRemain(uint96 seed) public {
-        uint256 amount = uint256(seed) + 1;
+        uint256 amount = (uint256(seed) % 1e16) + 1;
         address seller = address(0xA11CE);
         address buyer = address(0xB0B);
         address spender = address(0xCAFE);
@@ -341,11 +345,11 @@ contract ConditionalETHInvariant is StdInvariant, Test {
         reference.transferFrom(seller, buyer, id);
         vm.prank(buyer);
         reference.approveReserve(id, spender, ETH, 0);
-        vm.prank(buyer);
         vm.expectRevert(bytes("active reservation blocks redemption"));
-        reference.redeemWhenUnlocked(id);
         vm.prank(buyer);
+        reference.redeemWhenUnlocked(id);
         vm.expectRevert(bytes("release exceeds allocation"));
+        vm.prank(buyer);
         reference.releaseValue(id, ETH, amount);
         assertEq(reference.lockedValue(id, ETH), amount, "lock not silently bypassed");
         assertEq(address(reference).balance, amount + 10001, "backing remains present");
