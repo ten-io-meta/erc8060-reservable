@@ -130,7 +130,11 @@ contract OECLPartitionedClaimWitness {
         }
 
         if (requested == Kind.AccountingSurface) {
-            if (app != address(0) && loanFactory.boundAsset(app) != asset) {
+            address bound = loanFactory.boundAsset(app);
+            if (bound != address(0) && bound != asset) {
+                return _finish(e, requested, Verdict.REJECT, Reason.WrongAsset);
+            }
+            if (app != address(0) && bound != asset) {
                 (OECLCompositionGate.Verdict oldVerdict, ) = gate.assess(
                     asset, app, OECLCompositionGate.Capability.ReserveAccounting, 0
                 );
