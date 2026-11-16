@@ -250,6 +250,10 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
             emit Arbitrated(id, true);
         } else {
             require(msg.value == 0, "no ETH for liquidation");
+            // An arbitrator cannot shortcut the borrower's agreed challenge
+            // window. Full onchain settlement remains possible until burn.
+            require(block.timestamp > uint256(l.defaultAt) + l.challenge,
+                    "challenge open");
             emit Arbitrated(id, false);
             _liquidate(id, l);
         }
