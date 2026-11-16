@@ -36,7 +36,7 @@ describe("Real-ETH-backed reference candidates", function () {
       await reverts(strict.mint(), "zero ETH");
       await strict.mint({ value: one });
       expect(await strict.ownerOf(1)).to.equal(owner.address);
-      expect((await strict.valueOf(1)).eq(one)).to.equal(true);
+      expect((await strict["valueOf(uint256)"](1)).eq(one)).to.equal(true);
       expect((await strict.totalRedeemableValue()).eq(one)).to.equal(true);
       expect((await ethers.provider.getBalance(strict.address)).eq(one)).to.equal(true);
       expect(await strict.isSolvent()).to.equal(true);
@@ -59,7 +59,7 @@ describe("Real-ETH-backed reference candidates", function () {
       expect(after.add(gas).sub(before).eq(one)).to.equal(true);
       expect((await ethers.provider.getBalance(strict.address)).isZero()).to.equal(true);
       expect((await strict.totalRedeemableValue()).isZero()).to.equal(true);
-      await reverts(strict.valueOf(1), "nonexistent token");
+      await reverts(strict["valueOf(uint256)"](1), "nonexistent token");
       await reverts(strict.connect(buyer).burn(1));
     });
 
@@ -69,7 +69,7 @@ describe("Real-ETH-backed reference candidates", function () {
       expect((await strict.totalRedeemableValue()).eq(one.add(two))).to.equal(true);
       expect((await ethers.provider.getBalance(strict.address)).eq(one.add(two))).to.equal(true);
       await strict.burn(1);
-      expect((await strict.valueOf(2)).eq(two)).to.equal(true);
+      expect((await strict["valueOf(uint256)"](2)).eq(two)).to.equal(true);
       expect((await ethers.provider.getBalance(strict.address)).eq(two)).to.equal(true);
       await strict.connect(buyer).burn(2);
       expect((await strict.totalRedeemableValue()).isZero()).to.equal(true);
@@ -83,13 +83,13 @@ describe("Real-ETH-backed reference candidates", function () {
       expect(await strict.ownerOf(1)).to.equal(p.address);
       await reverts(p.attemptBurn(strict.address, 1), "ETH redemption failed");
       expect(await strict.ownerOf(1)).to.equal(p.address);
-      expect((await strict.valueOf(1)).eq(one)).to.equal(true);
+      expect((await strict["valueOf(uint256)"](1)).eq(one)).to.equal(true);
       expect((await strict.totalRedeemableValue()).eq(one)).to.equal(true);
       expect((await ethers.provider.getBalance(strict.address)).eq(one)).to.equal(true);
     });
 
     it("cannot mint or redeem a nonexistent NFT with no backing", async function () {
-      await reverts(strict.valueOf(123), "nonexistent token");
+      await reverts(strict["valueOf(uint256)"](123), "nonexistent token");
       await reverts(strict.burn(123));
     });
   });
