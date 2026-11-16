@@ -67,8 +67,8 @@ describe("Dutch auction: adversarial regression / experimental only", function (
     expect(await receiver.reentrySucceeded()).to.equal(false);
     expect(await nft.ownerOf(1)).to.equal(receiver.address);
     expect((await loan.loanInfo(1)).state).to.equal(SOLD);
-    expect(await loan.credits(lender.address)).to.equal(eth("1.2"));
-    expect(await loan.credits(borrower.address)).to.be.gt(0);
+    expect((await loan.credits(lender.address)).toString()).to.equal((eth("1.2")).toString());
+    expect((await loan.credits(borrower.address)).gt(0)).to.equal(true);
     expect(await loan.isCreditSolvent()).to.equal(true);
   });
 
@@ -80,9 +80,9 @@ describe("Dutch auction: adversarial regression / experimental only", function (
     await mustRevert(() => loan.connect(buyerA).buyCollateral(1, eth("3"), receiver.address, { value: eth("3") }));
     expect((await loan.loanInfo(1)).state).to.equal(OPEN);
     expect(await nft.ownerOf(1)).to.equal(loan.address);
-    expect(await loan.totalCredits()).to.equal(beforeCredits);
-    expect(await loan.credits(borrower.address)).to.equal(0);
-    expect(await loan.credits(lender.address)).to.equal(0);
+    expect((await loan.totalCredits()).toString()).to.equal((beforeCredits).toString());
+    expect((await loan.credits(borrower.address)).toString()).to.equal((0).toString());
+    expect((await loan.credits(lender.address)).toString()).to.equal((0).toString());
     expect(await loan.isCreditSolvent()).to.equal(true);
   });
 
@@ -105,7 +105,7 @@ describe("Dutch auction: adversarial regression / experimental only", function (
     await mustRevert(() => loan.connect(buyerA).buyCollateral(1, eth("3"), buyerA.address, { value: eth("3") }));
     expect((await loan.loanInfo(1)).state).to.equal(REPAID);
     expect(await nft.ownerOf(1)).to.equal(loan.address);
-    expect(await loan.credits(lender.address)).to.equal(eth("1.2"));
+    expect((await loan.credits(lender.address)).toString()).to.equal((eth("1.2")).toString());
     await (await loan.connect(borrower).claimCollateral(1, borrower.address)).wait();
     expect(await nft.ownerOf(1)).to.equal(borrower.address);
   });
@@ -116,7 +116,7 @@ describe("Dutch auction: adversarial regression / experimental only", function (
     await mustRevert(() => loan.connect(borrower).settleAfterDefault(1, { value: eth("1.2") }));
     expect((await loan.loanInfo(1)).state).to.equal(SOLD);
     expect(await nft.ownerOf(1)).to.equal(buyerA.address);
-    expect(await loan.credits(lender.address)).to.equal(eth("1.2"));
+    expect((await loan.credits(lender.address)).toString()).to.equal((eth("1.2")).toString());
     expect(await loan.isCreditSolvent()).to.equal(true);
   });
 
@@ -125,17 +125,17 @@ describe("Dutch auction: adversarial regression / experimental only", function (
     const started = (await loan.loanInfo(1)).saleStartedAt.toNumber();
     await jump(started + 1800);
     const expected = await loan.currentSalePrice(1);
-    expect(expected).to.equal(eth("2.5"));
+    expect(expected.toString()).to.equal(eth("2.5").toString());
     await mustRevert(() => loan.connect(buyerA).buyCollateral(1, eth("2.4"), buyerA.address, { value: eth("2.4") }));
     await (await loan.connect(buyerA).buyCollateral(1, eth("3"), buyerA.address, { value: eth("3") })).wait();
     // No timestamp advance is requested for the purchase; account for the mined block timestamp.
     const purchase = (await loan.queryFilter(loan.filters.NFTSold())).slice(-1)[0].args;
     expect(purchase.price.gte(eth("2"))).to.equal(true);
     expect(purchase.price.lte(eth("3"))).to.equal(true);
-    expect(await loan.credits(lender.address)).to.equal(eth("1.2"));
-    expect(await loan.credits(borrower.address)).to.equal(purchase.borrowerSurplus);
-    expect(await loan.credits(buyerA.address)).to.equal(purchase.buyerRefund);
-    expect(await loan.totalCredits()).to.equal(eth("3"));
+    expect((await loan.credits(lender.address)).toString()).to.equal((eth("1.2")).toString());
+    expect((await loan.credits(borrower.address)).toString()).to.equal((purchase.borrowerSurplus).toString());
+    expect((await loan.credits(buyerA.address)).toString()).to.equal((purchase.buyerRefund).toString());
+    expect((await loan.totalCredits()).toString()).to.equal((eth("3")).toString());
     expect(await nft.ownerOf(1)).to.equal(buyerA.address);
     expect(await loan.isCreditSolvent()).to.equal(true);
   });
@@ -161,9 +161,9 @@ describe("Dutch auction: adversarial regression / experimental only", function (
     await mustRevert(() => loan.connect(buyerA).buyCollateral(1, eth("3"), buyerA.address, { value: eth("3") }));
     await (await loan.burnUnsold(1)).wait();
     expect((await loan.loanInfo(1)).state).to.equal(LIQUIDATED);
-    expect(await loan.credits(lender.address)).to.equal(eth("1.2"));
-    expect(await loan.credits(borrower.address)).to.equal(eth("0.8"));
-    expect(await loan.totalCredits()).to.equal(eth("2"));
+    expect((await loan.credits(lender.address)).toString()).to.equal((eth("1.2")).toString());
+    expect((await loan.credits(borrower.address)).toString()).to.equal((eth("0.8")).toString());
+    expect((await loan.totalCredits()).toString()).to.equal((eth("2")).toString());
     expect(await loan.isCreditSolvent()).to.equal(true);
     await mustRevert(() => loan.burnUnsold(1));
   });
@@ -171,11 +171,11 @@ describe("Dutch auction: adversarial regression / experimental only", function (
   it("fake-value NFT is a documented trust boundary: sale accepts worthless collateral", async () => {
     const { loan, nft, buyerA, lender } = await setup(true);
     // The fake NFT advertises a 2 ETH floor without holding any ETH.
-    expect(await ethers.provider.getBalance(nft.address)).to.equal(0);
+    expect((await ethers.provider.getBalance(nft.address)).isZero()).to.equal(true);
     await (await loan.connect(buyerA).buyCollateral(1, eth("3"), buyerA.address, { value: eth("3") })).wait();
     expect((await loan.loanInfo(1)).state).to.equal(SOLD);
     expect(await nft.ownerOf(1)).to.equal(buyerA.address);
-    expect(await loan.credits(lender.address)).to.equal(eth("1.2"));
+    expect((await loan.credits(lender.address)).toString()).to.equal((eth("1.2")).toString());
     // This proves there is no independent backing verification at sale time.
     // It is a known deployment trust assumption, NOT a security pass.
   });
@@ -187,6 +187,6 @@ describe("Dutch auction: adversarial regression / experimental only", function (
     await mustRevert(() => loan.burnUnsold(1));
     expect((await loan.loanInfo(1)).state).to.equal(OPEN);
     expect(await nft.ownerOf(1)).to.equal(loan.address);
-    expect(await loan.totalCredits()).to.equal(0);
+    expect((await loan.totalCredits()).toString()).to.equal((0).toString());
   });
 });
