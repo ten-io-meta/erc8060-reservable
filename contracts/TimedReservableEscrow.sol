@@ -3,6 +3,11 @@ pragma solidity ^0.8.20;
 
 import "./IERC8060Reservable.sol";
 
+interface ITimedEscrowOwnerView {
+    function ownerOf(uint256 tokenId) external view returns (address);
+}
+
+/// @notice Accounting-only timed recovery demonstration; NO payment settlement.
 contract TimedReservableEscrow {
     IERC8060Reservable public immutable reservable;
 
@@ -47,6 +52,8 @@ contract TimedReservableEscrow {
         require(amount > 0, "amount is zero");
         require(seller != address(0), "invalid seller");
         require(duration > 0, "duration is zero");
+        require(ITimedEscrowOwnerView(address(reservable)).ownerOf(tokenId) == msg.sender, "not NFT owner");
+        require(seller == msg.sender, "seller must be owner");
 
         reservable.reserveValue(tokenId, asset, amount);
 
@@ -73,20 +80,10 @@ contract TimedReservableEscrow {
         );
     }
 
-    function settleTimedEscrow(uint256 escrowId) external {
-        TimedEscrow storage e = escrows[escrowId];
-
-        require(e.active, "escrow not active");
-        require(!e.refunded, "escrow refunded");
-
-        e.active = false;
-        e.settled = true;
-
-        // Demo only:
-        // Settlement is intentionally application-layer logic.
-        // IERC8060Reservable does not define payout or consumption.
-
-        emit TimedEscrowSettled(escrowId);
+    /// @notice Settlement is NOT implemented: no payout may be claimed by any caller.
+    /// @dev Revert without changing the lock; the documented timeout refund remains usable.
+    function settleTimedEscrow(uint256) external pure {
+        revert("settlement not implemented");
     }
 
     function refundExpiredEscrow(uint256 escrowId) external {
