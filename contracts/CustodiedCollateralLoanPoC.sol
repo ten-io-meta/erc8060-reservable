@@ -73,6 +73,12 @@ contract CustodiedCollateralLoanPoC is IERC721Receiver, ReentrancyGuard {
     mapping(address => uint256) public credits;
     uint256 public totalCredits;
 
+    /// @notice Credit solvency is checked against the actual ETH balance.
+    ///         The pledged NFT backing is separate until a verified burn.
+    function isCreditSolvent() external view returns (bool) {
+        return address(this).balance >= totalCredits;
+    }
+
     bool private expectingNFT;
     address private expectedFrom;
     uint256 private expectedTokenId;
