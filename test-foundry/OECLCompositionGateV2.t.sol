@@ -60,6 +60,7 @@ contract OECLCompositionGateV2Test is Test {
 
     function test_FakeValueAndFundedFakeNeverReceiveProvenance() public {
         AuctionFakeValueNFT fake = new AuctionFakeValueNFT();
+        vm.prank(borrower);
         fake.mint();
         vm.deal(address(fake), 2 ether); // donated balance does not prove liabilities
         assertEq(fake.valueOf(1), 2 ether);
@@ -100,8 +101,9 @@ contract OECLCompositionGateV2Test is Test {
             OECLCompositionGate.Verdict.UNKNOWN, OECLCompositionGate.Reason.UnrecognizedAsset);
         vm.expectRevert(bytes("strict NFT required"));
         gate.deployCustodialLiquidator(a);
+        address strictAsset = gate.deployStrictAsset();
         vm.expectRevert(bytes("conditional NFT required"));
-        gate.deployRepaymentOnly(gate.deployStrictAsset());
+        gate.deployRepaymentOnly(strictAsset);
     }
 
     function _createLoan(address asset, address app)
