@@ -45,3 +45,18 @@ npm test
 ```
 
 The reference uses ERC-8060's current draft from upstream PR #1315; the draft may still change. No modification to that PR is implied by this work.
+
+## Native ETH balance invariant tests
+
+Run `npx hardhat test test/eth-balance-invariants.js` to execute the additional, deterministic **state-model tests**. This suite is separate from the legacy accounting-only mock tests.
+
+- **Strict profile:** 48 sequenced mint / transfer / owner-only burn / rejected unauthorized-burn steps; checks `balance == SUM(valueOf(live tokens)) == totalRedeemableValue` after every transition. Burn tests independently verify the receiver's exact ETH increase net of transaction gas.
+- **Conditional profile:** two deterministic seeds, each performing 81 modeled steps over multiple ERC-721 tokens, owners and reservation spenders. Tests compare the model's per-token backing, per-spender locked allocations and remaining allowances against `backingOf`, `lockedValue`, `availableValue`, `reserveAllowance`, `totalBacked` and the EVM contract balance after every transition. Both sequences release all remaining locks and redeem all remaining claims.
+- **Rejected payouts:** a contract that refuses ETH is unable to withdraw or redeem. State, NFT ownership, outstanding liability and actual contract balance must all remain unchanged after revert.
+- **Unexpected surplus:** a laboratory `SELFDESTRUCT` transfer injects ETH without assigning it to any NFT. Contract assets may exceed total obligations; `isSolvent` must remain true, but reported NFT backing and actual redemption must exclude the surplus.
+
+With no forced surplus, the strict equality is `address(this).balance == totalRedeemableValue` (strict) or `address(this).balance == totalBacked` (conditional). With forced transfers, the solvency invariant is `balance >= liabilities`, and the surplus MUST NOT be counted as a claim.
+
+**Scope:** these are repeatable state-machine traces, **not exhaustive fuzzing or a formal proof**. The tests cover only simulated Hardhat ETH and a limited set of adversarial callbacks. They do not authorize a production deployment or provide guarantees about the broader application layer.
+
+**Validated run:** [GitHub Actions #43915508978](https://github.com/ten-io-meta/erc8060-reservable/actions/runs/43915508978) — 154 passing tests at commit `d33f37a`. Subsequent changes require fresh CI verification.
