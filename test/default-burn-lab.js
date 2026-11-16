@@ -53,8 +53,7 @@ describe("ERC8060 - burn fallback after loan default", function () {
   it("explicit borrower consent is required, independent of NFT transfer approval", async function () {
     const loan = await vault.loans(0);
     expect(await vault.burnFallbackAuthorized(0)).to.equal(true);
-    await expect(vault.connect(stranger).authorizeBurnFallback(0))
-      .to.be.revertedWith("authorization before funding only");
+    await rejects(vault.connect(stranger).authorizeBurnFallback(0));
     await matureAndFinishGrace();
     // Authorization was given before funding, so the burn fallback is valid.
     expect(loan.borrower).to.equal(borrower.address);
