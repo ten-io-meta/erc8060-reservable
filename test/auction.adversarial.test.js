@@ -144,7 +144,7 @@ describe("Dutch auction: adversarial regression / experimental only", function (
     const { loan, buyerA, nft } = await setup();
     const info = await loan.loanInfo(1);
     const deadline = info.saleStartedAt.toNumber() + info.saleDuration.toNumber();
-    await jump(deadline - 1);
+    await jump(deadline - 2);
     await mustRevert(() => loan.burnUnsold(1));
     // Put the successful BUY in the final permitted timestamp.
     await network.provider.send("evm_setNextBlockTimestamp", [deadline]);
