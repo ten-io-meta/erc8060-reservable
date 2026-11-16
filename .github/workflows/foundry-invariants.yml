@@ -1,0 +1,39 @@
+name: Foundry stateful ETH invariants
+
+on:
+  push:
+    branches:
+      - test/foundry-invariant-campaign
+      - tests/reservable-integration
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forge-invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install OpenZeppelin dependencies
+        run: npm ci
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Install forge-std test dependency (CI only)
+        run: git clone --depth 1 --recurse-submodules https://github.com/foundry-rs/forge-std.git lib/forge-std
+      - name: Compile and fuzz model-based economic invariants
+        env:
+          FOUNDRY_PROFILE: ci
+        run: forge test --match-path 'test-foundry/*.t.sol' -vv
