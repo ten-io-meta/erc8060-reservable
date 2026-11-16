@@ -103,10 +103,9 @@ Demonstrate that value can be committed without transferring ownership or custod
 2. Escrow reserves value using `reserveValue()`.
 3. NFT ownership remains unchanged.
 4. Reserved value cannot be withdrawn.
-5. Escrow either:
+5. The authorized creator can release the reservation.
 
-   * releases the reservation
-   * settles according to external application logic
+This minimal example does **not** execute settlement or payout: `settleEscrow()` deliberately reverts. Settlement must be implemented by a separate application with its own beneficiary, payment and dispute rules.
 
 ### Properties Demonstrated
 
@@ -135,7 +134,7 @@ Demonstrate that value can be committed to an agent task without transferring ow
 * Multiple concurrent bonds
 * Reservation accumulation
 * Independent bond release
-* Independent bond settlement
+* Explicit rejection of unsupported bond settlement
 * Invalid state protection
 * Allowance enforcement
 * Available value enforcement
@@ -192,7 +191,7 @@ Properties demonstrated:
 * Multiple concurrent bonds
 * Reservation accumulation
 * Independent bond release
-* Independent bond settlement
+* Explicit rejection of unsupported bond settlement
 * Invalid state protection
 * Allowance enforcement
 * Available value enforcement
@@ -257,7 +256,7 @@ Current test suite validates:
 * Agent bond coexistence
 * Lending coexistence
 * Independent release paths
-* Independent settlement paths
+* Independent reservations and release paths; actual settlement requires external application logic
 
 ### Multi-Asset Validation
 
@@ -275,7 +274,7 @@ Current test suite validates:
 * Expired escrow recovery
 * Recovery without modifying IERC8060Reservable
 
-**Historical baseline (commit `acf39f6`): **135 local Hardhat tests passed**, including tests that deliberately demonstrated insecure contract behavior. This number is not a security certification; execute `npm test` and review CI for the current branch.**
+**Latest validated hardening commit (`d466523`): 137 passing Hardhat tests, 0 failures** ([GitHub Actions](https://github.com/ten-io-meta/erc8060-reservable/actions/runs/43783440784)). The historical baseline (`acf39f6`) had 135 passing tests, including demonstrations of unsafe behavior. Passing tests do not constitute a security audit.
 
 ---
 
