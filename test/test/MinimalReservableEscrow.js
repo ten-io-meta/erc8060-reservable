@@ -10,6 +10,13 @@ describe("MinimalReservableEscrow", function () {
   let owner, seller;
   let reservable, escrow;
 
+  async function expectRejected(promise, expected) {
+    let error;
+    try { await promise; } catch (e) { error = e; }
+    expect(error, "expected revert").to.exist;
+    expect(error.message).to.include(expected);
+  }
+
   beforeEach(async function () {
     [owner, seller] = await ethers.getSigners();
 
@@ -124,55 +131,24 @@ describe("MinimalReservableEscrow", function () {
     ).to.equal(ONE_ETH.toString());
   });
 
-  it("cannot settle an escrow after release", async function () {
-    await reservable.approveReserve(
-      TOKEN_ID,
-      escrow.address,
-      ETH_ASSET,
-      ESCROW_AMOUNT
-    );
-
-    await escrow.createEscrow(
-      TOKEN_ID,
-      ETH_ASSET,
-      ESCROW_AMOUNT,
-      seller.address
-    );
-
+  it("cannot falsely settle an escrow after release", async function () {
+    await reservable.approveReserve(TOKEN_ID, escrow.address, ETH_ASSET, ESCROW_AMOUNT);
+    await escrow.createEscrow(TOKEN_ID, ETH_ASSET, ESCROW_AMOUNT, seller.address);
     await escrow.releaseEscrow(0);
-
-    try {
-      await escrow.settleEscrow(0);
-      expect.fail("Expected transaction to revert");
-    } catch (error) {
-      expect(error.message).to.include("Escrow not active");
-    }
-
-    const escrowInfo = await escrow.escrows(0);
-
-    expect(escrowInfo.active).to.equal(false);
-    expect(escrowInfo.settled).to.equal(false);
+    await expectRejected(escrow.settleEscrow(0), "settlement not implemented");
+    const info = await escrow.escrows(0);
+    expect(info.active).to.equal(false);
+    expect(info.settled).to.equal(false);
   });
 
-  it("settles escrow without releasing reserved accounting", async function () {
-    await reservable.approveReserve(
-      TOKEN_ID,
-      escrow.address,
-      ETH_ASSET,
-      ESCROW_AMOUNT
-    );
-
-    await escrow.createEscrow(
-      TOKEN_ID,
-      ETH_ASSET,
-      ESCROW_AMOUNT,
-      seller.address
-    );
-
-    await escrow.settleEscrow(0);
-
-    expect(
-      (await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()
-    ).to.equal(ESCROW_AMOUNT.toString());
+  it("false escrow settlement is rejected without orphaning the reservation", async function () {
+    await reservable.approveReserve(TOKEN_ID, escrow.address, ETH_ASSET, ESCROW_AMOUNT);
+    await escrow.createEscrow(TOKEN_ID, ETH_ASSET, ESCROW_AMOUNT, seller.address);
+    await expectRejected(escrow.settleEscrow(0), "settlement not implemented");
+    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).eq(ESCROW_AMOUNT)).to.equal(true);
+    expect((await escrow.escrows(0)).active).to.equal(true);
+    await escrow.releaseEscrow(0);
+    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).isZero()).to.equal(true);
   });
+
 });
