@@ -4,13 +4,14 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "../IERC8060Reservable.sol";
+import "../IReserveControllerView.sol";
 import "./IERC721ValueReference.sol";
 
 /// @notice Experimental ETH-backed reservation profile, NOT strict ERC-8060.
 /// @dev Active locks can block redemption; this contract does NOT advertise
 ///      IERC721ValueReference in ERC-165. Never represent it as strict ERC-8060.
 ///      Not audited or suitable for custody of production funds.
-contract ReservableConditionalETHReference is ERC721, ReentrancyGuard, IERC8060Reservable {
+contract ReservableConditionalETHReference is ERC721, ReentrancyGuard, IERC8060Reservable, IReserveControllerView {
     address private constant ETH_ASSET = address(0);
 
     struct Reservation {
@@ -108,6 +109,17 @@ contract ReservableConditionalETHReference is ERC721, ReentrancyGuard, IERC8060R
     ) public view override returns (uint256) {
         _checkLiveAsset(tokenId, asset);
         return _locked[tokenId];
+    }
+
+    /// @notice OPTIONAL experimental evidence of the REAL controller-specific lock.
+    /// @dev Reads authoritative reservation storage directly, not an app's claim.
+    ///      The lock persists after transfer even when the old approval epoch
+    ///      becomes invalid. This is intentionally NOT added to the standard ABI.
+    function lockedBy(uint256 tokenId, address controller, address asset)
+        external view override returns (uint256)
+    {
+        _checkLiveAsset(tokenId, asset);
+        return _reservations[tokenId][controller].locked;
     }
 
     function availableValue(
