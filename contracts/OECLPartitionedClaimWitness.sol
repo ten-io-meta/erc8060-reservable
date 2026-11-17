@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "./OECLCompositionGate.sol";
 import "./PartitionedReserveLoanPoC.sol";
+import "./IReserveControllerView.sol";
 
 /// @notice Closed-world creator of the exact, non-upgradeable partitioned loan.
 /// @dev Cannot import arbitrary app addresses or self-report capabilities.
@@ -50,7 +51,8 @@ contract OECLPartitionedClaimWitness {
         MissingCustody,
         InvalidLoanBinding,
         InvalidEconomicState,
-        InsolventCredits
+        InsolventCredits,
+        ControllerAllocationMismatch
     }
 
     struct Evidence {
@@ -65,6 +67,8 @@ contract OECLPartitionedClaimWitness {
         uint256 payoff;
         uint256 backing;
         uint256 locked;
+        uint256 controllerLocked;
+        uint256 otherLocked;
         uint256 available;
         uint256 dueAfterGrace;
         uint256 observedBlock;
@@ -179,6 +183,11 @@ contract OECLPartitionedClaimWitness {
         }
         e.backing = nft.backingOf(l.tokenId);
         e.locked = nft.lockedValue(l.tokenId, address(0));
+        // Read the authoritative NFT ledger. A controller's own loanInfo and
+        // the aggregate lockedValue CANNOT prove which spender owns the lock.
+        e.controllerLocked = IReserveControllerView(asset).lockedBy(
+            l.tokenId, app, address(0)
+        );
         e.available = nft.availableValue(l.tokenId, address(0));
         if (l.principal == 0 || l.payoff < l.principal ||
             l.collateral < l.payoff || e.backing < l.collateral ||
@@ -186,6 +195,10 @@ contract OECLPartitionedClaimWitness {
             e.available != e.backing - e.locked) {
             return _finish(e, requested, Verdict.REJECT, Reason.InvalidEconomicState);
         }
+        if (e.controllerLocked != l.collateral || e.controllerLocked > e.locked) {
+            return _finish(e, requested, Verdict.REJECT, Reason.ControllerAllocationMismatch);
+        }
+        e.otherLocked = e.locked - e.controllerLocked;
         if (!loan.isCreditSolvent()) {
             return _finish(e, requested, Verdict.REJECT, Reason.InsolventCredits);
         }
