@@ -135,7 +135,8 @@ contract PartitionedReserveLoanPoC is IERC721Receiver, ReentrancyGuard {
 
         nft.approveReserve(o.tokenId, address(this), ETH_ASSET, o.collateral);
         nft.reserveValue(o.tokenId, ETH_ASSET, o.collateral);
-        require(nft.lockedValue(o.tokenId, ETH_ASSET) >= o.collateral, "lock missing");
+        require(nft.lockedBy(o.tokenId, address(this), ETH_ASSET) == o.collateral,
+                "controller lock mismatch");
         emit Proposed(id, o.tokenId, o.collateral);
     }
 
@@ -148,7 +149,8 @@ contract PartitionedReserveLoanPoC is IERC721Receiver, ReentrancyGuard {
         require(block.timestamp <= l.fundingDeadline, "funding expired");
         require(msg.value == l.principal, "wrong principal");
         require(nft.ownerOf(l.tokenId) == address(this), "collateral missing");
-        require(nft.lockedValue(l.tokenId, ETH_ASSET) >= l.collateral, "lock missing");
+        require(nft.lockedBy(l.tokenId, address(this), ETH_ASSET) == l.collateral,
+                "controller lock mismatch");
         require(nft.isSolvent(), "insolvent NFT");
         l.state = State.Active;
         l.dueAt = uint64(block.timestamp + l.term);
@@ -185,7 +187,8 @@ contract PartitionedReserveLoanPoC is IERC721Receiver, ReentrancyGuard {
         uint256 beforeBacking = nft.backingOf(l.tokenId);
         uint256 beforeLocked = nft.lockedValue(l.tokenId, ETH_ASSET);
         uint256 beforeAvailable = nft.availableValue(l.tokenId, ETH_ASSET);
-        require(beforeLocked >= l.collateral, "own lock missing");
+        require(nft.lockedBy(l.tokenId, address(this), ETH_ASSET) == l.collateral,
+                "controller lock mismatch");
         require(beforeBacking >= beforeLocked, "backing below obligations");
 
         l.state = State.Liquidated;
