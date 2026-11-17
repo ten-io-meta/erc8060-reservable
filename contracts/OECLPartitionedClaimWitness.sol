@@ -195,10 +195,13 @@ contract OECLPartitionedClaimWitness {
             e.available != e.backing - e.locked) {
             return _finish(e, requested, Verdict.REJECT, Reason.InvalidEconomicState);
         }
-        if (e.controllerLocked != l.collateral || e.controllerLocked > e.locked) {
+        if (e.controllerLocked > e.locked) {
             return _finish(e, requested, Verdict.REJECT, Reason.ControllerAllocationMismatch);
         }
         e.otherLocked = e.locked - e.controllerLocked;
+        if (e.controllerLocked != l.collateral) {
+            return _finish(e, requested, Verdict.REJECT, Reason.ControllerAllocationMismatch);
+        }
         if (!loan.isCreditSolvent()) {
             return _finish(e, requested, Verdict.REJECT, Reason.InsolventCredits);
         }
