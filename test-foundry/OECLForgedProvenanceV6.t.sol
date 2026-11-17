@@ -186,6 +186,14 @@ contract OECLForgedProvenanceV6Test is Test {
         assertEq(uint256(genuinePin.inspectConditional(address(genuineGate), counterfeit)),
             uint256(OECLProvenancePin.Verdict.UNKNOWN));
 
+        // Merely creating *another* pin with the attacker's chosen gate does
+        // not authenticate it. An independently verified pin address/root is
+        // necessary; otherwise the fake profile is admitted again.
+        OECLProvenancePin attackerChosenPin = new OECLProvenancePin(address(forgedGate));
+        assertEq(uint256(attackerChosenPin.inspectConditional(address(forgedGate), counterfeit)),
+            uint256(OECLProvenancePin.Verdict.ADMIT_PROFILE),
+            "pinning to a dishonest root also admits dishonesty");
+
         // This is the counterexample: codehash is IDENTICAL, yet authenticated
         // factory provenance is absent, and the economic asset has ZERO real ETH.
         assertEq(counterfeit.balance, 0);
