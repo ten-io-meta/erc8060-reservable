@@ -1,6 +1,8 @@
 # IERC8060Reservable
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20850524.svg)](https://doi.org/10.5281/zenodo.20850524)
-Minimal reservation accounting extension for ERC-8060 value-bearing NFTs.
+Minimal reservation accounting extension for ERC-8060-style value-bearing NFTs.
+> **SECURITY / SCOPE (2026-11).** This is an experimental six-function reservation ACCOUNTING interface, not a strict ERC-8060 full-burn implementation and not an automatic creditor payment right. Passing tests include intentionally reproduced UNSAFE scenarios. The research PRs #10–16 are stacked, open and NOT present on main as a consolidated audited release; notably [PR #16](https://github.com/ten-io-meta/erc8060-reservable/pull/16) demonstrates forged NFT/factory constructor storage with identical runtime codehash. Never use these demo contracts as real ETH collateral without independently authenticated provenance, economic settlement tests and external audit.
+
 
 The extension allows authorized spenders to reserve portions of a token's underlying value without taking custody of the NFT itself.
 
@@ -18,7 +20,7 @@ Interactive demonstration of:
 - multi-application coexistence
 - availableValue vs lockedValue
 
-Current repository status: 61 passing tests.
+Earlier published repository baseline: 61 passing tests. This is NOT the latest stacked research branch or an audit certificate; verify exact-head CI for the version under consideration.
 
 Reference implementation, test suite, escrow example, lending example, timed escrow example, and agent bond example included in this repository.
 
@@ -43,7 +45,7 @@ The resulting design maintains a strict separation of concerns:
 
 | Layer                              | Responsibility                        |
 | ---------------------------------- | ------------------------------------- |
-| ERC-8060                           | Value custody and `totalValue`        |
+| ERC-8060                           | `valueOf` and atomic owner-only `burn` (strict profile) |
 | IERC8060Reservable                 | Reservation accounting                |
 | Escrows / Applications             | Settlement, execution, and conditions |
 | Reputation Systems (e.g. ERC-8004) | Identity, trust, and discoverability  |
@@ -51,6 +53,7 @@ The resulting design maintains a strict separation of concerns:
 
 `IERC8060Reservable` standardizes only:
 
+* `approveReserve`
 * `reserveAllowance`
 * `reserveValue`
 * `releaseValue`
@@ -63,9 +66,9 @@ Reservations and locked value are bound to the `tokenId` and travel with the NFT
 
 The extension deliberately excludes settlement semantics, dispute resolution, liquidation rules, deadlines, reputation systems, and business logic.
 
-Multiple adversarial reviews identified no missing protocol primitive, no internal contradiction among the invariants, and no irreducible failure mode originating from the accounting layer itself.
+Earlier reductions converged on a minimal accounting interface; they did **not** establish a complete proof of financial safety, settlement enforceability, or deployment provenance. The later OECL forged-provenance counterexamples show why authenticated factories, constructor inputs and actual ETH execution must be checked independently.
 
-The design is therefore considered to have reached **protocol closure** for reservation accounting.
+Accordingly, the six-function ABI is kept stable for research, but **protocol closure is not a security certification or a declaration that all financial use cases are solved**.
 
 ---
 
