@@ -124,55 +124,30 @@ describe("MinimalReservableEscrow", function () {
     ).to.equal(ONE_ETH.toString());
   });
 
-  it("cannot settle an escrow after release", async function () {
-    await reservable.approveReserve(
-      TOKEN_ID,
-      escrow.address,
-      ETH_ASSET,
-      ESCROW_AMOUNT
-    );
-
-    await escrow.createEscrow(
-      TOKEN_ID,
-      ETH_ASSET,
-      ESCROW_AMOUNT,
-      seller.address
-    );
-
+  it("cannot settle after release, because the mock has no payout", async function () {
+    await reservable.approveReserve(TOKEN_ID, escrow.address, ETH_ASSET, ESCROW_AMOUNT);
+    await escrow.createEscrow(TOKEN_ID, ETH_ASSET, ESCROW_AMOUNT, seller.address);
     await escrow.releaseEscrow(0);
-
     try {
       await escrow.settleEscrow(0);
-      expect.fail("Expected transaction to revert");
-    } catch (error) {
-      expect(error.message).to.include("Escrow not active");
+      expect.fail("Expected unavailable settlement");
+    } catch(e) {
+      expect(e.message).to.include("escrow payout not implemented");
     }
-
-    const escrowInfo = await escrow.escrows(0);
-
-    expect(escrowInfo.active).to.equal(false);
-    expect(escrowInfo.settled).to.equal(false);
+    const e=await escrow.escrows(0);
+    expect(e.active).to.equal(false);
+    expect(e.settled).to.equal(false);
   });
 
-  it("settles escrow without releasing reserved accounting", async function () {
-    await reservable.approveReserve(
-      TOKEN_ID,
-      escrow.address,
-      ETH_ASSET,
-      ESCROW_AMOUNT
-    );
-
-    await escrow.createEscrow(
-      TOKEN_ID,
-      ETH_ASSET,
-      ESCROW_AMOUNT,
-      seller.address
-    );
-
-    await escrow.settleEscrow(0);
-
-    expect(
-      (await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()
-    ).to.equal(ESCROW_AMOUNT.toString());
+  it("fails closed without marking unpaid escrow as settled", async function () {
+    await reservable.approveReserve(TOKEN_ID, escrow.address, ETH_ASSET, ESCROW_AMOUNT);
+    await escrow.createEscrow(TOKEN_ID, ETH_ASSET, ESCROW_AMOUNT, seller.address);
+    try { await escrow.settleEscrow(0); expect.fail("Expected unavailable settlement"); }
+    catch(e) { expect(e.message).to.include("escrow payout not implemented"); }
+    const e=await escrow.escrows(0);
+    expect(e.active).to.equal(true);
+    expect(e.settled).to.equal(false);
+    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString())
+      .to.equal(ESCROW_AMOUNT.toString());
   });
 });
