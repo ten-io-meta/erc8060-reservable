@@ -3,96 +3,66 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IERC8060Reservable Demo</title>
+  <title>IERC8060Reservable — simulated accounting demo</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <main class="app">
     <section class="hero">
-      <p class="eyebrow">IERC8060Reservable</p>
-      <h1>Commit value without moving the asset.</h1>
-      <p class="subtitle">
-        A minimal reservation accounting primitive for ERC-8060 value-bearing NFTs.
-      </p>
+      <p class="eyebrow">IERC8060Reservable — browser-only simulation</p>
+      <h1>Explore reservation accounting without moving an asset.</h1>
+      <p class="subtitle">An illustrative accounting model, not a deployed NFT, wallet or blockchain application.</p>
+      <div class="disclosure" role="note" aria-label="Simulation warning">
+        <strong>SIMULATED BALANCES — NOT REAL ETH</strong>
+        <p>Figures are invented demo units stored only in this browser. No ETH is deposited, secured, transferred
+        or redeemed, and no NFT is minted or transferred on-chain. This is not strict ERC-8060 redemption,
+        a live escrow, or an audited financial product.</p>
+      </div>
     </section>
-
-    <section class="card">
+    <section class="card" aria-label="Synthetic reservation accounting">
       <div class="card-header">
         <div>
-          <p class="label">Token</p>
-          <h2>ERC-8060 Treasury #1</h2>
+          <p class="label">Synthetic record — not an on-chain token</p>
+          <h2>Simulated reservation token #1</h2>
         </div>
-        <span class="status" id="ownerLabel">
-  Owner: Alice
-</span>
+        <span class="status" id="ownerLabel">Simulated holder: Alice</span>
       </div>
-
       <div class="values">
-        <div>
-          <p>Total Value</p>
-          <strong id="totalValue">1000 ETH</strong>
-        </div>
-        <div>
-          <p>Locked Value</p>
-          <strong id="lockedValue">600 ETH</strong>
-        </div>
-        <div>
-          <p>Available Value</p>
-          <strong id="availableValue">400 ETH</strong>
-        </div>
+        <div><p>Recorded total (not backing)</p><strong id="totalValue">1000 demo units</strong></div>
+        <div><p>Locked accounting units</p><strong id="lockedValue">600 demo units</strong></div>
+        <div><p>Unreserved accounting units</p><strong id="availableValue">400 demo units</strong></div>
       </div>
-
-      <div class="bar">
-        <div id="lockedBar"></div>
-      </div>
-
-      <h3>Reservations</h3>
-
+      <p class="interpretation">Unreserved accounting value does <strong>not</strong> imply an immediately
+      executable ETH withdrawal or strict ERC-8060 <code>burn()</code> payout.</p>
+      <div class="bar" aria-label="Proportion of synthetic value recorded as locked"><div id="lockedBar"></div></div>
+      <h3>Simulated reservations</h3>
       <div class="reservations">
-        <div class="reservation">
-          <span>Lending collateral</span>
-          <strong id="lendingAmount">300 ETH</strong>
-        </div>
-
-        <div class="reservation">
-          <span>Agent task bond</span>
-          <strong id="bondAmount">200 ETH</strong>
-        </div>
-
-        <div class="reservation">
-          <span>Escrow commitment</span>
-          <strong id="escrowAmount">100 ETH</strong>
-        </div>
+        <div class="reservation"><span>Lending commitment</span><strong id="lendingAmount">300 demo units</strong></div>
+        <div class="reservation"><span>Agent task commitment</span><strong id="bondAmount">200 demo units</strong></div>
+        <div class="reservation"><span>Escrow commitment</span><strong id="escrowAmount">100 demo units</strong></div>
       </div>
-
-   <div class="controls">
-
-  <button onclick="transferNFT()">
-    TRANSFER NFT
-  </button>
-
-</div>
-  <button onclick="reserveLending(50)">+50 Lending</button>
-  <button class="release" onclick="releaseLending(50)">-50 Lending</button>
-
-  <button onclick="reserveBond(50)">+50 Bond</button>
-  <button class="release" onclick="releaseBond(50)">-50 Bond</button>
-
-  <button onclick="reserveEscrow(50)">+50 Escrow</button>
-  <button class="release" onclick="releaseEscrow(50)">-50 Escrow</button>
-</div>
+      <div class="controls">
+        <button type="button" onclick="transferNFT()">SIMULATE HOLDER CHANGE</button>
+        <button type="button" onclick="reserveLending(50)">+50 Lending</button>
+        <button type="button" class="release" onclick="releaseLending(50)">-50 Lending</button>
+        <button type="button" onclick="reserveBond(50)">+50 Bond</button>
+        <button type="button" class="release" onclick="releaseBond(50)">-50 Bond</button>
+        <button type="button" onclick="reserveEscrow(50)">+50 Escrow</button>
+        <button type="button" class="release" onclick="releaseEscrow(50)">-50 Escrow</button>
       </div>
     </section>
-
-    <section class="explain">
-      <p>
-        The NFT never leaves the owner. The value is not transferred to the
-        applications. Each application only reserves part of the token's
-        available value.
-      </p>
+    <section class="card boundaries" aria-label="Limitations of this demo">
+      <h3>Financial and security boundaries</h3>
+      <p><strong>Actual ETH backing:</strong> not established.
+      <strong>Strict ERC-8060 redemption:</strong> not implemented.
+      <strong>ERC-165 profile detection:</strong> not implemented.
+      <strong>Creditor settlement:</strong> not implemented.
+      <strong>Independent security audit:</strong> not completed.</p>
+      <p>The holder-change button changes only a JavaScript variable. Real transfer authorization,
+      contract bytecode, ETH payments, solvency and owner ETH-receipt behavior are not tested here.</p>
+      <p>See the <a href="https://github.com/ten-io-meta/erc8060-reservable/blob/main/docs/strict-vs-reservation-conditioned-discovery.md">strict-vs-conditional redemption and wallet disclosure guide</a>.</p>
     </section>
   </main>
-
   <script src="./app.js"></script>
 </body>
 </html>

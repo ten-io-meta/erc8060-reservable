@@ -77,18 +77,18 @@ function refresh() {
   const locked = currentLocked();
   const available = total - locked;
 
-  document.getElementById("totalValue").innerText = `${total} ETH`;
-  document.getElementById("lockedValue").innerText = `${locked} ETH`;
-  document.getElementById("availableValue").innerText = `${available} ETH`;
+  document.getElementById("totalValue").innerText = `${total} demo units`;
+  document.getElementById("lockedValue").innerText = `${locked} demo units`;
+  document.getElementById("availableValue").innerText = `${available} demo units`;
 
   document.getElementById("lockedBar").style.width =
     `${(locked / total) * 100}%`;
 
-  document.getElementById("lendingAmount").innerText = `${lending} ETH`;
-  document.getElementById("bondAmount").innerText = `${bond} ETH`;
-  document.getElementById("escrowAmount").innerText = `${escrow} ETH`;
+  document.getElementById("lendingAmount").innerText = `${lending} demo units`;
+  document.getElementById("bondAmount").innerText = `${bond} demo units`;
+  document.getElementById("escrowAmount").innerText = `${escrow} demo units`;
   document.getElementById("ownerLabel").innerText =
-  `Owner: ${owner}`;
+  `Simulated holder: ${owner}`;
 }
 function transferNFT() {
 
@@ -101,7 +101,7 @@ function transferNFT() {
   refresh();
 
   alert(
-    "NFT ownership transferred. Reservations remained attached to the token."
+    "Simulation only: the displayed holder changed in your browser. The synthetic commitments stayed with this record. No NFT was transferred on-chain."
   );
 }
 window.addEventListener("load", refresh);
