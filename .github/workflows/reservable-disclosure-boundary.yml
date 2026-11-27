@@ -6,6 +6,15 @@ on:
       - "contracts/IERC8060Reservable.sol"
       - "contracts/ERC8060ReservableMock.sol"
       - "docs/strict-vs-reservation-conditioned-discovery.md"
+      - "docs/external-audit-scope-and-findings.md"
+      - "docs/DEVELOPMENT_REPORT.md"
+      - "docs/commitment-accounting.md"
+      - "docs/disclosure-and-indexing.md"
+      - "docs/recoverable-applications.md"
+      - "README.md"
+      - "demo/**"
+      - "scripts/check-public-disclosure.test.cjs"
+      - "test/ExternalAuditReproduction.test.js"
       - "test/ReservationDisclosureBoundary.test.js"
       - ".github/workflows/reservable-disclosure-boundary.yml"
   workflow_dispatch:
@@ -29,5 +38,9 @@ jobs:
         run: npm ci --ignore-scripts --no-fund
       - name: Compile contracts and run complete existing regression suite
         run: npx hardhat test
-      - name: Re-run new negative disclosure tests independently
+      - name: Verify browser simulation, source claims and absence of fake ETH labels
+        run: node --test scripts/check-public-disclosure.test.cjs
+      - name: Reproduce known UNSAFE authorization and settlement boundaries
+        run: npx hardhat test test/ExternalAuditReproduction.test.js
+      - name: Re-run conditional-profile disclosure tests independently
         run: npx hardhat test test/ReservationDisclosureBoundary.test.js
