@@ -27,5 +27,7 @@ jobs:
           cache: npm
       - name: Install repository's recorded dependency lock
         run: npm ci --ignore-scripts --no-fund
-      - name: Compile mock and run negative disclosure tests
+      - name: Compile contracts and run complete existing regression suite
+        run: npx hardhat test
+      - name: Re-run new negative disclosure tests independently
         run: npx hardhat test test/ReservationDisclosureBoundary.test.js
