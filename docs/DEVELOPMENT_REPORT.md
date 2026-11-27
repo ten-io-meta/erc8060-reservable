@@ -128,7 +128,7 @@ Review themes included:
 * race conditions
 * accounting conservation
 
-That historical review was not an exhaustive search or independent audit. The current mock leaves prior-owner reserve permissions active after a transfer, permits public bookkeeping token creation, and cannot enforce a live ETH payout. See [external audit scope](external-audit-scope-and-findings.md).
+That historical review was not an exhaustive search or independent audit. The PR #19 baseline allowed prior-owner reserve approvals after transfer and arbitrary mock token issuance. A separate hardening branch now invalidates stale approvals and limits test token issuance; placeholder settlements revert. The host still cannot enforce live ETH payout, creditor approval, or solvency. See [external audit scope](external-audit-scope-and-findings.md).
 
 ## Current Conclusion
 
