@@ -161,3 +161,11 @@ h3 {
 .controls button.release {
   background: #475569;
 }
+/* Make simulation and redemption limitations prominent, without suggesting that funds exist. */
+.disclosure { margin-top:20px; padding:18px 20px; border:2px solid #fbbf24; border-radius:12px; background:#33270b; color:#fff3cf; line-height:1.55; }
+.disclosure strong { display:block; letter-spacing:.02em; font-size:16px; }
+.disclosure p { margin:.5em 0 0; }
+.interpretation { padding:12px 14px; border-left:3px solid #7dd3fc; background:#1f2937; color:#dbeafe; line-height:1.5; }
+.boundaries { border-color:#fbbf24; line-height:1.7; }
+.boundaries a { color:#7dd3fc; }
+.values strong { font-size:clamp(16px,2vw,23px); }
