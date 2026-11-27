@@ -2,7 +2,7 @@
 
 ## Motivation
 
-ERC-8060 introduces value-bearing NFTs through `totalValue()`.
+The merged strict ERC-8060 Draft defines `valueOf(uint256)` and owner-only atomic `burn(uint256)` for native ETH. It does not define the optional Reservable host's asset-qualified `totalValue(tokenId, asset)` accounting method.
 
 However, many real-world applications require value to be committed without:
 
@@ -43,11 +43,12 @@ without requiring:
 
 ## IERC8060Reservable
 
-IERC8060Reservable introduces a minimal reservation layer on top of ERC-8060.
+IERC8060Reservable proposes a six-function experimental reservation accounting layer for ERC-8060-style values. The present mock does not combine this layer with strict ERC-8060 ETH custody or redemptions.
 
 Core functions:
 
 ```solidity
+approveReserve(...)
 reserveValue(...)
 releaseValue(...)
 reserveAllowance(...)
@@ -76,13 +77,13 @@ Reputation Systems	Trust and discoverability
 Risk Engines	Interpretation and underwriting
 Properties
 
-The model guarantees:
+Within the local mock's bounded accounting conditions, tests exercise:
 
-no over-allocation
-no double reservation
-no double release
-transfer persistence
-ownership independence
+- no recorded over-allocation when the expected allowances and states are used
+- rejecting duplicate over-release
+- persistence of locked entries across a simulated ownership transfer
+
+**These are not real collateral, ETH delivery or unconditional redemption guarantees.** The mock has an acknowledged residual-authorization defect on transfer; see [external review scope](external-audit-scope-and-findings.md).
 
 Reservations are attached to tokenId.
 
@@ -113,6 +114,6 @@ ERC-8060 provides value-bearing NFTs.
 
 IERC8060Reservable provides commitment accounting for that value.
 
-Together they enable applications to coordinate value without transferring ownership, custody, or execution authority.
+The current files illustrate how *recorded accounting entries* could coordinate applications. They do not prove that funds were deposited, preserved or delivered, nor authorize a production reservation/settlement system.
 
 The reservation layer remains intentionally minimal and delegates settlement semantics to application-layer protocols.
