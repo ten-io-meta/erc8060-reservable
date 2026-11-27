@@ -1,0 +1,31 @@
+name: Reservable conditional-profile disclosure regression
+
+on:
+  pull_request:
+    paths:
+      - "contracts/IERC8060Reservable.sol"
+      - "contracts/ERC8060ReservableMock.sol"
+      - "docs/strict-vs-reservation-conditioned-discovery.md"
+      - "test/ReservationDisclosureBoundary.test.js"
+      - ".github/workflows/reservable-disclosure-boundary.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disclosure-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install repository's recorded dependency lock
+        run: npm ci --ignore-scripts --no-fund
+      - name: Compile mock and run negative disclosure tests
+        run: npx hardhat test test/ReservationDisclosureBoundary.test.js
