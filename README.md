@@ -23,9 +23,15 @@ The bundled `ERC8060ReservableMock` uses synthetic accounting:
 and the mock does **not** implement ERC-165 or strict `burn`. Its
 `totalValue` must never be shown as authenticated backing.
 
-## Live Demo
+## Live Demo — synthetic browser-only accounting
 
 https://ten-io-meta.github.io/erc8060-reservable/demo/
+
+**No wallet, no Ethereum RPC, no on-chain transactions, no actual ETH and no live NFT.**
+The JavaScript demo displays invented **demo units** and simulates a holder change
+in browser memory. It cannot demonstrate backing, custody, ERC-165 detection,
+strict ERC-8060 `burn()` redemption, creditor settlement, or deployment safety.
+See [external audit scope and currently reproduced negative findings](docs/external-audit-scope-and-findings.md).
 
 Interactive demonstration of:
 
@@ -95,7 +101,7 @@ The example demonstrates that escrow-style workflows can be implemented without 
 
 ### Goal
 
-Demonstrate that value can be committed without transferring ownership or custody.
+Illustrate how accounting commitments can be recorded without moving the *mock's* owner reference or receiving real ETH. This does not demonstrate real asset custody or an enforceable commitment.
 
 ### Flow
 
@@ -106,15 +112,15 @@ Demonstrate that value can be committed without transferring ownership or custod
 5. Escrow either:
 
    * releases the reservation
-   * settles according to external application logic
+   * records an application-specific settled flag (the demo does not pay a recipient)
 
 ### Properties Demonstrated
 
-* No custody transfer
-* No NFT transfer
-* No double reservation
-* Locked value travels with the token
-* Settlement logic remains external
+* No on-chain ETH or NFT custody in this accounting mock
+* No change to the mock owner when a reservation is recorded
+* No double allocation within the mock's accounting conditions
+* Locked accounting entries persist under the mock's holder change
+* Application settlement and payout are NOT implemented by the mock
 * `IERC8060Reservable` remains purely an accounting primitive
 
 ---
@@ -135,7 +141,7 @@ Demonstrate that value can be committed to an agent task without transferring ow
 * Multiple concurrent bonds
 * Reservation accumulation
 * Independent bond release
-* Independent bond settlement
+* Independent bond state marking (no ETH payment)
 * Invalid state protection
 * Allowance enforcement
 * Available value enforcement
@@ -148,16 +154,16 @@ The included examples demonstrate that reservation accounting is sufficient to s
 
 Current examples validate:
 
-* Escrow workflows
-* Agent task commitments
-* Lending collateral commitments
-* Timed escrow recovery patterns
+* Synthetic escrow state transitions (not creditor payouts)
+* Synthetic agent task commitments (not real bonds)
+* Lending-style accounting locks (not loan collateral custody)
+* Timed releases of recorded locks (not real ETH refunds)
 
 while preserving the original architectural separation:
 
 | Layer              | Responsibility                  |
 | ------------------ | ------------------------------- |
-| ERC-8060           | Value custody                   |
+| Strict ERC-8060 implementation (separate) | Actual native ETH backing and owner-only atomic burn, NOT provided by this mock |
 | IERC8060Reservable | Reservation accounting          |
 | Applications       | Settlement and execution        |
 | Reputation Systems | Identity and trust              |
@@ -203,10 +209,10 @@ Demonstrates lending-style collateral commitments using reservation accounting.
 
 Properties demonstrated:
 
-* Loan collateral locking
+* Loan-style accounting locks only, not authenticated or funded collateral
 * Independent coexistence with escrows and task bonds
 * Transfer persistence
-* Independent collateral release
+* Release of recorded accounting locks only
 * Shared accounting across applications
 
 ### TimedReservableEscrow
@@ -216,8 +222,8 @@ Demonstrates application-layer recovery mechanisms without modifying IERC8060Res
 Properties demonstrated:
 
 * Deadline-based expiration
-* Refund of abandoned reservations
-* Recovery from inactive counterparties
+* Cancellation of abandoned accounting locks (no ETH refund)
+* Timer-based accounting unlock, not funds recovery
 * Anti-griefing application pattern
 
 ---
@@ -257,7 +263,7 @@ Current test suite validates:
 * Agent bond coexistence
 * Lending coexistence
 * Independent release paths
-* Independent settlement paths
+* Independent application-state transitions; no executable payout or economic settlement
 
 ### Multi-Asset Validation
 
@@ -372,37 +378,23 @@ See:
 
 * Disclosure and Indexing Profile
 
-### Protocol Closure
+### Limits of historical design reviews
 
-Multiple hostile review rounds, adversarial testing, and independent analysis were unable to identify a transaction sequence capable of violating the documented accounting invariants.
+Earlier analyses considered a small, fixed accounting interface convenient for several
+synthetic application examples. They did **not** independently certify security,
+settlement, deployed source provenance, owner authorization, unconditional redemption,
+or prove the absence of other attack sequences.
 
-Remaining concerns were consistently classified as:
+This repository is **not protocol-closed in a financial-security sense**. Current
+reproducible negative controls include leftover reserve permissions after holder
+changes in the mock, publicly callable bookkeeping minting, and example "settle"
+functions that record flags without executing payments. Those are real reasons to
+reject production use of the examples, not reasons to claim the six-function
+interface is itself impossible.
 
-* Integration Layer
-* Application Layer
-* Disclosure Layer
-* Recoverability Layer
-
-No missing mandatory accounting primitive was identified.
-
-## Protocol Closure
-
-Multiple adversarial reviews, application-layer implementations, and test expansions have failed to identify any missing reservation-accounting primitive.
-
-The current repository demonstrates:
-
-* Reservation accounting without custody transfer
-* Reservation accounting without ownership transfer
-* Multiple concurrent commitments
-* Multi-application coexistence
-* Multi-asset isolation
-* Multi-token isolation
-* Transfer persistence
-* Recovery patterns implemented entirely at the application layer
-
-No additional accounting primitive has been required to support these behaviors.
-
-The design is therefore considered to have reached protocol closure for reservation accounting.
+An external auditor has not certified these contracts. The
+[external audit scope and findings](docs/external-audit-scope-and-findings.md)
+set out the reproduction cases and release prerequisites.
 
 ---
 
