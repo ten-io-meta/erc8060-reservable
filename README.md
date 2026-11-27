@@ -8,6 +8,21 @@ The extension allows authorized spenders to reserve portions of a token's underl
 
 **Status:** Draft
 
+## Strict ERC-8060 versus reservation-conditioned wallet disclosure
+
+The official ERC-8060 Draft defines `IERC721Value` with **both**
+`valueOf(uint256)` and `burn(uint256)` (strict ERC-165 interface ID
+`0x88495fe7`). This repository's six-function `IERC8060Reservable`
+is **optional reservation accounting**, not a strict native-ETH redemption
+implementation or a separately standardized ERC-165 profile.
+
+**Read [the profile detection and marketplace disclosure guide](docs/strict-vs-reservation-conditioned-discovery.md)** before displaying a recorded balance as redeemable native ETH. The guide distinguishes total, locked, available and currently executable value, documents the limits of ERC-165 and warns that an actual contract-owner ETH payout may fail atomically.
+
+The bundled `ERC8060ReservableMock` uses synthetic accounting:
+`mintValue` does not receive actual ETH, `withdraw` does not pay ETH,
+and the mock does **not** implement ERC-165 or strict `burn`. Its
+`totalValue` must never be shown as authenticated backing.
+
 ## Live Demo
 
 https://ten-io-meta.github.io/erc8060-reservable/demo/
@@ -260,7 +275,7 @@ Current test suite validates:
 * Expired escrow recovery
 * Recovery without modifying IERC8060Reservable
 
-**Current repository status: 61 passing tests.**
+**Historical baseline:** earlier published evidence reported 61 passing tests. This is not an exact-head claim for the newer stacked research PRs; consult each branch's CI logs before asserting its current test count.
 
 ---
 
