@@ -73,61 +73,36 @@ describe("AgentTaskBond", function () {
     );
   });
 
-  it("settles task bond", async function () {
-    await bond.createTaskBond(
-      TOKEN_ID,
-      ETH_ASSET,
-      BOND_AMOUNT,
-      agent.address,
-      TASK_HASH
-    );
-
-    await bond.settleTaskBond(0);
-
-    const info = await bond.bonds(0);
-
-    expect(info.settled).to.equal(true);
-    expect(info.active).to.equal(false);
-  });
-
-  it("cannot release a settled task bond", async function () {
-    await bond.createTaskBond(
-      TOKEN_ID,
-      ETH_ASSET,
-      BOND_AMOUNT,
-      agent.address,
-      TASK_HASH
-    );
-
-    await bond.settleTaskBond(0);
-
-    try {
-      await bond.releaseTaskBond(0);
-      expect.fail("Expected transaction to revert");
-    } catch (error) {
-      expect(error.message).to.include("bond not active");
-    }
-  });
-
-  it("cannot settle a released task bond", async function () {
-    await bond.createTaskBond(
-      TOKEN_ID,
-      ETH_ASSET,
-      BOND_AMOUNT,
-      agent.address,
-      TASK_HASH
-    );
-
-    await bond.releaseTaskBond(0);
-
+  it("blocks simulated settlement rather than marking a bond paid", async function () {
+    await bond.createTaskBond(TOKEN_ID, ETH_ASSET, BOND_AMOUNT, agent.address, TASK_HASH);
     try {
       await bond.settleTaskBond(0);
-      expect.fail("Expected transaction to revert");
-    } catch (error) {
-      expect(error.message).to.include("bond not active");
+      expect.fail("Expected settlement to be unavailable");
+    } catch (e) {
+      expect(e.message).to.include("bond payout not implemented");
     }
+    const info=await bond.bonds(0);
+    expect(info.active).to.equal(true);
+    expect(info.settled).to.equal(false);
+    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).eq(BOND_AMOUNT)).to.equal(true);
   });
-  it("multiple task bonds accumulate locked value correctly", async function () {
+
+it("failed bond settlement leaves a recoverable accounting lock", async function () {
+    await bond.createTaskBond(TOKEN_ID, ETH_ASSET, BOND_AMOUNT, agent.address, TASK_HASH);
+    try { await bond.settleTaskBond(0); expect.fail("Expected revert"); }
+    catch(e) { expect(e.message).to.include("bond payout not implemented"); }
+    await bond.releaseTaskBond(0);
+    expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).eq(0)).to.equal(true);
+  });
+
+it("cannot pretend settlement succeeded on a released bond", async function () {
+    await bond.createTaskBond(TOKEN_ID, ETH_ASSET, BOND_AMOUNT, agent.address, TASK_HASH);
+    await bond.releaseTaskBond(0);
+    try { await bond.settleTaskBond(0); expect.fail("Expected revert"); }
+    catch(e) { expect(e.message).to.include("bond payout not implemented"); }
+  });
+
+it("multiple task bonds accumulate locked value correctly", async function () {
 
   await reservable.approveReserve(
     TOKEN_ID,
@@ -210,48 +185,23 @@ it("releasing one task bond does not release other active bonds", async function
   expect(first.active).to.equal(false);
   expect(second.active).to.equal(true);
 });
-it("settling one task bond does not affect other active bonds", async function () {
-  await reservable.approveReserve(
-    TOKEN_ID,
-    bond.address,
-    ETH_ASSET,
-    500
-  );
-
-  await bond.createTaskBond(
-    TOKEN_ID,
-    ETH_ASSET,
-    100,
-    agent.address,
-    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("task-1"))
-  );
-
-  await bond.createTaskBond(
-    TOKEN_ID,
-    ETH_ASSET,
-    150,
-    agent.address,
-    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("task-2"))
-  );
-
-  await bond.settleTaskBond(0);
-
-  expect(
-    (await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()
-  ).to.equal("250");
-
-  expect(
-    (await reservable.availableValue(TOKEN_ID, ETH_ASSET)).toString()
-  ).to.equal("750");
-
-  const first = await bond.bonds(0);
-  const second = await bond.bonds(1);
-
-  expect(first.active).to.equal(false);
-  expect(first.settled).to.equal(true);
+it("blocked settlement does not change any of two active bond locks", async function () {
+  await reservable.approveReserve(TOKEN_ID, bond.address, ETH_ASSET, 500);
+  await bond.createTaskBond(TOKEN_ID, ETH_ASSET, 100, agent.address,
+    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("task-1")));
+  await bond.createTaskBond(TOKEN_ID, ETH_ASSET, 150, agent.address,
+    ethers.utils.keccak256(ethers.utils.toUtf8Bytes("task-2")));
+  try { await bond.settleTaskBond(0); expect.fail("Expected revert"); }
+  catch(e) { expect(e.message).to.include("bond payout not implemented"); }
+  expect((await reservable.lockedValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal("250");
+  expect((await reservable.availableValue(TOKEN_ID, ETH_ASSET)).toString()).to.equal("750");
+  const first=await bond.bonds(0), second=await bond.bonds(1);
+  expect(first.active).to.equal(true);
+  expect(first.settled).to.equal(false);
   expect(second.active).to.equal(true);
   expect(second.settled).to.equal(false);
 });
+
 it("cannot create task bond with zero amount", async function () {
   try {
     await bond.createTaskBond(
@@ -318,25 +268,18 @@ it("cannot release the same task bond twice", async function () {
   }
 });
 
-it("cannot settle the same task bond twice", async function () {
-  await bond.createTaskBond(
-    TOKEN_ID,
-    ETH_ASSET,
-    BOND_AMOUNT,
-    agent.address,
-    TASK_HASH
-  );
-
-  await bond.settleTaskBond(0);
-
-  try {
-    await bond.settleTaskBond(0);
-    expect.fail("Expected transaction to revert");
-  } catch (error) {
-    expect(error.message).to.include("bond not active");
+it("repeated pretend bond settlement attempts never succeed", async function () {
+  await bond.createTaskBond(TOKEN_ID, ETH_ASSET, BOND_AMOUNT, agent.address, TASK_HASH);
+  for(let i=0;i<2;i++){
+    try { await bond.settleTaskBond(0); expect.fail("Expected revert"); }
+    catch(e) { expect(e.message).to.include("bond payout not implemented"); }
   }
+  const info=await bond.bonds(0);
+  expect(info.active).to.equal(true);
+  expect(info.settled).to.equal(false);
 });
-  it("cannot create task bond without sufficient available value", async function () {
+
+it("cannot create task bond without sufficient available value", async function () {
   await reservable.approveReserve(
     TOKEN_ID,
     bond.address,
