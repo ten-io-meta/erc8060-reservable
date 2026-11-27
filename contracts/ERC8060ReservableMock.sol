@@ -4,18 +4,24 @@ pragma solidity ^0.8.20;
 import "./IERC8060Reservable.sol";
 
 contract ERC8060ReservableMock is IERC8060Reservable {
+    // Test-only identity controls. This host still holds NO ETH.
+    address public immutable mockIssuer;
     mapping(uint256 => address) private _owners;
+    // Invalidate unused spender permissions in O(1) at every ownership change.
+    mapping(uint256 => uint256) private _ownerEpoch;
     mapping(uint256 => mapping(address => uint256)) private _totalValue;
     mapping(uint256 => mapping(address => uint256)) private _lockedValue;
 
     struct Reservation {
         uint256 approved;
         uint256 locked;
+        uint256 approvalEpoch;
     }
 
     mapping(uint256 => mapping(address => mapping(address => Reservation))) private _reservations;
 
     constructor() {
+        mockIssuer = msg.sender;
         _owners[1] = msg.sender;
     }
 
@@ -25,6 +31,8 @@ contract ERC8060ReservableMock is IERC8060Reservable {
     }
 
     function mintToken(uint256 tokenId, address to) external {
+        require(msg.sender == mockIssuer, "not mock issuer");
+        require(to != address(0), "invalid recipient");
         require(_owners[tokenId] == address(0), "already minted");
         _owners[tokenId] = to;
     }
@@ -44,9 +52,11 @@ contract ERC8060ReservableMock is IERC8060Reservable {
     function transferFrom(address from, address to, uint256 tokenId) external {
         require(_owners[tokenId] == from, "wrong owner");
         require(msg.sender == from, "not authorized");
+        require(to != address(0), "invalid recipient");
 
-        _clearUnusedReserveAllowances(tokenId);
-
+        // Existing locks remain bound to tokenId and can still be released by
+        // their spender. Prior-owner unused allowances are now stale.
+        ++_ownerEpoch[tokenId];
         _owners[tokenId] = to;
     }
 
@@ -61,7 +71,9 @@ contract ERC8060ReservableMock is IERC8060Reservable {
         address asset,
         uint256 amount
     ) external onlyOwner(tokenId) {
-        _reservations[tokenId][spender][asset].approved = amount;
+        Reservation storage r = _reservations[tokenId][spender][asset];
+        r.approved = amount;
+        r.approvalEpoch = _ownerEpoch[tokenId];
         emit ReserveApproval(tokenId, spender, asset, amount);
     }
 
@@ -107,6 +119,10 @@ contract ERC8060ReservableMock is IERC8060Reservable {
     ) public view returns (uint256) {
         Reservation memory r = _reservations[tokenId][spender][asset];
 
+        if (r.approvalEpoch != _ownerEpoch[tokenId]) {
+            return 0; // Cannot consume unused permission granted by a former owner.
+        }
+
         if (r.approved <= r.locked) {
             return 0;
         }
@@ -128,10 +144,4 @@ contract ERC8060ReservableMock is IERC8060Reservable {
         return _totalValue[tokenId][asset] - _lockedValue[tokenId][asset];
     }
 
-    function _clearUnusedReserveAllowances(uint256 tokenId) internal {
-        // Mock limitation:
-        // This reference mock does not maintain an enumerable spender list.
-        // Production implementations SHOULD clear or invalidate unused
-        // reserve allowance on transfer while preserving active locked value.
-    }
 }
