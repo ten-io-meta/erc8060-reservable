@@ -2,7 +2,9 @@
 
 ## Status
 
-Informational
+Informational — experimental reservation-accounting disclosure only, not a strict ERC-8060 redemption profile and not a deployment/security certification.
+
+**For the current ERC-8060 Draft's `valueOf` + `burn` guarantee, ERC-165 identity, and safe wallet detection of reservation-conditioned profiles, read [strict-versus-conditioned discovery](strict-vs-reservation-conditioned-discovery.md).** The accounting mock does not hold actual ETH; its `totalValue` must not be treated as verified backing or immediate redemption.
 
 ## Purpose
 
@@ -85,13 +87,15 @@ event ValueReleased(
     address indexed asset,
     uint256 amount
 );
+```
+
 Indexers can use these events to reconstruct:
 
 reserve approvals
 active reservations
 released reservations
 latent authorization exposure
-Marketplace Guidance
+## Marketplace Guidance
 
 Marketplaces SHOULD NOT display only totalValue.
 
@@ -105,7 +109,7 @@ recovery status if known
 
 A token with high totalValue but low availableValue SHOULD be treated as encumbered.
 
-Risk Engine Guidance
+## Risk Engine Guidance
 
 Risk engines SHOULD treat:
 
@@ -123,13 +127,13 @@ unknown reservation profiles
 
 Unknown reservation metadata SHOULD be treated as higher risk.
 
-Transfer Disclosure
+## Transfer Disclosure
 
 Because active reservations travel with tokenId, wallets and marketplaces SHOULD surface reservation state before transfer, listing, purchase, collateralization, or valuation.
 
 A recipient of a reservable token SHOULD be able to see whether value is already locked before accepting or purchasing the token.
 
-Non-Goals
+## Non-Goals
 
 This profile does not modify the core IERC8060Reservable interface.
 
@@ -140,7 +144,7 @@ mandatory enumeration
 mandatory marketplace behavior
 mandatory recovery semantics
 global allowance caps
-Relationship to IERC8060Reservable
+## Relationship to IERC8060Reservable
 
 IERC8060Reservable remains a minimal accounting primitive.
 
