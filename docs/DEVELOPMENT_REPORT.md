@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft (Protocol-Closed Accounting Layer)
+Draft — experimental accounting model; no independent security audit or production certification
 
 Repository:
 https://github.com/ten-io-meta/erc8060-reservable
@@ -12,7 +12,7 @@ https://ten-io-meta.github.io/erc8060-reservable/demo/
 
 ## Objective
 
-IERC8060Reservable extends ERC-8060 with a minimal reservation accounting primitive.
+IERC8060Reservable is an experimental, optional reservation-accounting interface for ERC-8060-style tokens. It is not an implemented extension of the merged strict native-ETH ERC-8060 burn guarantee.
 
 The goal is to allow applications to reserve portions of embedded token value without transferring NFT ownership or moving value out of the token itself.
 
@@ -27,8 +27,9 @@ The extension intentionally separates:
 
 ## Standardized Surface
 
-The extension standardizes:
+The current research interface declares six methods, not a formally ratified extension:
 
+* approveReserve()
 * reserveAllowance()
 * reserveValue()
 * releaseValue()
@@ -94,9 +95,7 @@ Included:
 
 ## Test Coverage
 
-Current status:
-
-* 61 passing tests
+Historical baseline: 61 passing tests; a later exact-head local CI run passed 65 general tests, plus 4 separate disclosure-boundary tests. These are mock accounting and scenario tests, not native-ETH settlement proofs or an external audit.
 
 Coverage includes:
 
@@ -129,13 +128,11 @@ Review themes included:
 * race conditions
 * accounting conservation
 
-No protocol-layer accounting defect was identified.
-
-No missing mandatory accounting primitive was identified.
+That historical review was not an exhaustive search or independent audit. The current mock leaves prior-owner reserve permissions active after a transfer, permits public bookkeeping token creation, and cannot enforce a live ETH payout. See [external audit scope](external-audit-scope-and-findings.md).
 
 ## Current Conclusion
 
-IERC8060Reservable appears protocol-closed for reservation accounting.
+The six-function reservation-accounting interface remains an experimental research baseline, with implementation authorization, economic settlement and live ERC-8060 compatibility unverified.
 
 The remaining concerns identified during review were classified as:
 
@@ -144,5 +141,4 @@ The remaining concerns identified during review were classified as:
 * recoverability concerns
 * integration requirements for ERC-8060 implementations
 
-No additional accounting primitive has been demonstrated as necessary.
-Final hostile review rounds did not identify any transaction sequence capable of violating the documented accounting invariants. Remaining concerns were classified as integration-layer, application-layer, disclosure-layer, or recoverability-layer risks.
+No independent reviewer has certified the interface or its applications. The known mock and example limitations must be resolved or excluded before deploying real funds; no lack-of-vulnerabilities claim is made.
