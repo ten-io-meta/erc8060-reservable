@@ -67,7 +67,10 @@ contract MinimalLendingCollateral {
 
         require(l.active, "loan not active");
         require(!l.closed, "loan already closed");
+        require(msg.sender == l.borrower, "not loan borrower");
 
+        // This is only a mock bookkeeping release, not proof of lender
+        // repayment or a liquidation/creditor-rights protocol.
         l.active = false;
         l.closed = true;
 
