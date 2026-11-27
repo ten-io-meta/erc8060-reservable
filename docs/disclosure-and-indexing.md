@@ -27,9 +27,9 @@ The core distinction is:
 
 | Concept | Meaning |
 |---|---|
-| totalValue | Total embedded value associated with the token |
+| totalValue | Total value recorded by the optional host; not authenticated ETH collateral |
 | lockedValue | Value currently committed through active reservations |
-| availableValue | Value not currently reserved and available for withdrawal or new reservations |
+| availableValue | Recorded value not currently reserved, possibly usable by the host's accounting functions; not a verified ETH payout or strict burn right |
 | reserveAllowance | Revocable authorization to attempt a future reservation |
 
 `reserveAllowance` is not the same as `lockedValue`.
@@ -101,20 +101,20 @@ Marketplaces SHOULD NOT display only totalValue.
 
 Listings SHOULD distinguish:
 
-total embedded value
-currently locked value
-currently available value
+recorded total value (not proof of backing)
+recorded locked value (not proof of creditor payment)
+recorded unreserved value (not proof of redemption availability)
 known reservation applications
 recovery status if known
 
-A token with high totalValue but low availableValue SHOULD be treated as encumbered.
+A token with high recorded totalValue but low availableValue may be accounting-encumbered; no conclusion about real collateral or strict ERC-8060 redemption follows without contract-specific verification.
 
 ## Risk Engine Guidance
 
 Risk engines SHOULD treat:
 
 lockedValue as actual committed exposure
-availableValue as currently usable value
+availableValue as unreserved accounting value (not guaranteed liquidity)
 reserveAllowance as latent authorization exposure
 
 Risk engines SHOULD NOT assume that unused reserve allowance is equivalent to active locked value.
