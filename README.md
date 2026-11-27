@@ -1,7 +1,7 @@
 # IERC8060Reservable
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20850524.svg)](https://doi.org/10.5281/zenodo.20850524)
 Minimal reservation accounting extension for ERC-8060-style value-bearing NFTs.
-> **SECURITY / SCOPE (2026-11).** This is an experimental six-function reservation ACCOUNTING interface, not a strict ERC-8060 full-burn implementation and not an automatic creditor payment right. Passing tests include intentionally reproduced UNSAFE scenarios. The research PRs #10–16 are stacked, open and NOT present on main as a consolidated audited release; notably [PR #16](https://github.com/ten-io-meta/erc8060-reservable/pull/16) demonstrates forged NFT/factory constructor storage with identical runtime codehash. Never use these demo contracts as real ETH collateral without independently authenticated provenance, economic settlement tests and external audit.
+> **SECURITY / SCOPE (2026-11).** This is an experimental six-function reservation ACCOUNTING interface, not a strict ERC-8060 full-burn implementation and not an automatic creditor payment right. Historical PR #19 tests deliberately reproduced unsafe baseline outcomes; the hardening branch reverses those tests. This is not a third-party audit. The research PRs #10–16 are stacked, open and NOT present on main as a consolidated audited release; notably [PR #16](https://github.com/ten-io-meta/erc8060-reservable/pull/16) demonstrates forged NFT/factory constructor storage with identical runtime codehash. Never use these demo contracts as real ETH collateral without independently authenticated provenance, economic settlement tests and external audit.
 
 
 The extension allows authorized spenders to reserve portions of a token's underlying value without taking custody of the NFT itself.
@@ -112,7 +112,7 @@ Illustrate how accounting commitments can be recorded without moving the *mock's
 5. Escrow either:
 
    * releases the reservation
-   * records an application-specific settled flag (the demo does not pay a recipient)
+   * rejects fake settlement calls because the example has no ETH payout route
 
 ### Properties Demonstrated
 
@@ -198,7 +198,7 @@ Properties demonstrated:
 * Multiple concurrent bonds
 * Reservation accumulation
 * Independent bond release
-* Independent bond settlement
+* Bond settlement disabled: the mock reverts rather than claim payment
 * Invalid state protection
 * Allowance enforcement
 * Available value enforcement
@@ -385,12 +385,7 @@ synthetic application examples. They did **not** independently certify security,
 settlement, deployed source provenance, owner authorization, unconditional redemption,
 or prove the absence of other attack sequences.
 
-This repository is **not protocol-closed in a financial-security sense**. Current
-reproducible negative controls include leftover reserve permissions after holder
-changes in the mock, publicly callable bookkeeping minting, and example "settle"
-functions that record flags without executing payments. Those are real reasons to
-reject production use of the examples, not reasons to claim the six-function
-interface is itself impossible.
+This repository is **not protocol-closed in a financial-security sense**. Historical PR #19 reproduced prior-owner allowance carryover, unauthorized synthetic issuance, unguarded releases and false settlement flags. A separate hardening branch now invalidates unused old-owner approvals, gates mock issuance and restricts example releases, while disabling fake settlement. However, the host still holds no ETH, borrower-only closing is not creditor approval, and real escrow/loan payment is not modeled. These examples are not production-ready and the six-function interface is not security-certified.
 
 An external auditor has not certified these contracts. The
 [external audit scope and findings](docs/external-audit-scope-and-findings.md)

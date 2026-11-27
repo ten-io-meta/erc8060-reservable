@@ -83,7 +83,7 @@ Within the local mock's bounded accounting conditions, tests exercise:
 - rejecting duplicate over-release
 - persistence of locked entries across a simulated ownership transfer
 
-**These are not real collateral, ETH delivery or unconditional redemption guarantees.** The mock has an acknowledged residual-authorization defect on transfer; see [external review scope](external-audit-scope-and-findings.md).
+**These are not real collateral, ETH delivery or unconditional redemption guarantees.** The PR #19 baseline contained a stale-authorization defect after transfer; the hardening branch introduces owner-epoch invalidation. This does not prove real ETH custody, actual creditor rights, repayment, or production settlement. See [external review scope](external-audit-scope-and-findings.md).
 
 Reservations are attached to tokenId.
 

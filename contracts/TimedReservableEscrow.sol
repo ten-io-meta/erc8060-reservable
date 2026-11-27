@@ -74,19 +74,9 @@ contract TimedReservableEscrow {
     }
 
     function settleTimedEscrow(uint256 escrowId) external {
-        TimedEscrow storage e = escrows[escrowId];
-
-        require(e.active, "escrow not active");
-        require(!e.refunded, "escrow refunded");
-
-        e.active = false;
-        e.settled = true;
-
-        // Demo only:
-        // Settlement is intentionally application-layer logic.
-        // IERC8060Reservable does not define payout or consumption.
-
-        emit TimedEscrowSettled(escrowId);
+        escrowId;
+        // No real beneficiary payment exists in this research example.
+        revert("timed escrow payout not implemented");
     }
 
     function refundExpiredEscrow(uint256 escrowId) external {

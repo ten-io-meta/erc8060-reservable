@@ -11,6 +11,7 @@ contract MinimalReservableEscrow {
         address asset;
         uint256 amount;
         address seller;
+        address creator; // Test-only originator; not payment authorization.
         bool active;
         bool settled;
     }
@@ -48,6 +49,7 @@ contract MinimalReservableEscrow {
             asset: asset,
             amount: amount,
             seller: seller,
+            creator: msg.sender,
             active: true,
             settled: false
         });
@@ -60,6 +62,7 @@ contract MinimalReservableEscrow {
 
         require(e.active, "Escrow not active");
         require(!e.settled, "Escrow already settled");
+        require(msg.sender == e.creator, "not escrow creator");
 
         e.active = false;
 
@@ -69,18 +72,9 @@ contract MinimalReservableEscrow {
     }
 
     function settleEscrow(uint256 escrowId) external {
-        Escrow storage e = escrows[escrowId];
-
-        require(e.active, "Escrow not active");
-        require(!e.settled, "Escrow already settled");
-
-        e.active = false;
-        e.settled = true;
-
-        // Demo only:
-        // IERC8060Reservable deliberately does not define settlement.
-        // A real application would call its own settlement / payout logic here.
-
-        emit EscrowSettled(escrowId);
+        // Fail closed: a mock accounting transition cannot certify a payout.
+        // Keep selector for backwards-compatible *rejection* of unsafe calls.
+        escrowId; // Silence unused parameter; not a settlement record.
+        revert("escrow payout not implemented");
     }
 }

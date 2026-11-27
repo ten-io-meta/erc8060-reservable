@@ -70,9 +70,11 @@ test("public documentation does not certify mock ETH redemptions or final securi
   assert.match(scope,/R-01/);
   assert.match(scope,/R-05/);
 });
-test("test file explicitly records unremediated risks rather than falsely asserting safety",()=>{
+test("post-remediation suite rejects five historic unsafe outcomes without claiming production safety",()=>{
   const suite=read("test/ExternalAuditReproduction.test.js");
-  assert.equal((suite.match(/it\("UNSAFE:/g)||[]).length,5);
-  assert.match(suite,/prior owner unused allowance remains executable/i);
-  assert.match(suite,/third party may mark another user's lending position closed/i);
+  assert.equal((suite.match(/it\("FIX CHECK R-0[1-5]:/g)||[]).length,5);
+  assert.match(suite,/transfer invalidates unused permissions/i);
+  assert.match(suite,/bogus escrow settlement fails closed/i);
+  assert.match(suite,/unrelated caller cannot close another borrower's bookkeeping lock/i);
+  assert.match(read("docs/external-audit-scope-and-findings.md"),/INDEPENDENT AUDIT STILL REQUIRED/i);
 });

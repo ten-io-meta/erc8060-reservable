@@ -5,6 +5,34 @@
 Scope repository: https://github.com/ten-io-meta/erc8060-reservable
 Code baseline: `main` merge commit `fdbfc409186db45b173aa4f01e8d574d09a3eab3` plus the prospective disclosure/audit-reproduction PR. Independent reviewers MUST pin their own exact commit hash before issuing any conclusion. The publicly merged [ERC-8060 Draft](https://github.com/ethereum/ERCs/blob/master/ERCS/erc-8060.md) is a separate specification with a distinct ETH-backed reference repository.
 
+## Post-baseline hardening: internal mitigation, NOT an independent audit
+
+The R-01 through R-05 table below is the historical **PR #19 baseline** at commit
+`365a2bae095cdfdce7beb4f6a8bb7a1041cdc2e3`. Those unsafe behaviors were
+reproduced at that commit. On the separate unmerged branch
+`security/restrict-reservable-mock-authority-and-disable-fake-settlement`:
+
+- R-01: an owner-change epoch invalidates unused pre-transfer allowances while
+  allowing the previous spender to release an already active lock.
+- R-02: only the original mock deployer can create a bookkeeping token ID.
+- R-03: placeholder settlement methods now revert: no ERC-8060 ETH payout is
+  silently represented as settled, including in bond and timed-escrow examples.
+- R-04: escrow and bond accounting releases require the recorded initiator.
+- R-05: mock loan closure requires its recorded borrower; **this does not
+  establish lender authority, repayment, or enforceable real collateral**.
+
+The former test file `test/ExternalAuditReproduction.test.js` was inverted to
+reject the previous unsafe operations on this branch. The old results still
+belong to the pinned archived commit. Neither internal suite constitutes an
+independent audit. No externally reviewed real-payment settlement design exists.
+
+**INDEPENDENT AUDIT STILL REQUIRED. Financial/custodial release remains BLOCKED.**
+
+Residual risks for an external reviewer include permissionless creation of
+escrow/loan accounting commitments when an application has a standing allowance,
+borrower-controlled closing without real creditor consent, unverifiable
+underlying assets or contract provenance, ERC721 noncompliance of the mock,
+no payment capability, and any adverse consequences of authorization epochs.
 ## 1. What does and does not exist
 
 This repository implements six **experimental reservation accounting** functions:
@@ -17,7 +45,7 @@ The `demo/` website is a local JavaScript calculator using fictitious units and 
 
 ## 2. Reproducible negative findings — deliberately NOT fixed in these prototypes
 
-The tests at `test/ExternalAuditReproduction.test.js` reproduce the exact behavior below with deterministic local actors. A passing test means the unsafe behavior **is still possible**, not that it has been remediated.
+At the pinned PR #19 baseline, `test/ExternalAuditReproduction.test.js` reproduces these unsafe cases. In the later hardening branch the tests assert the same unauthorized calls are rejected. Always quote the exact branch and commit when interpreting either suite.
 
 | ID | Code boundary | Observable issue | Impact IF mistakenly reused in a financially active implementation | Proposed auditor concern |
 | --- | --- | --- | --- | --- |
@@ -28,7 +56,7 @@ The tests at `test/ExternalAuditReproduction.test.js` reproduce the exact behavi
 | R-05 | `MinimalLendingCollateral.closeLoan` | Any caller may close a position and release its accounting reservation | Third-party invalidation of purported collateral lock | High |
 | R-06 | `demo/index.html`, `demo/app.js`, historical documentation | Formerly rendered simulated counters as "ETH" and suggested ERC-8060 treasury/settlement outcomes | False impression of backing, strict redemptions or audited custody | Public-disclosure hazard — addressed by this PR |
 
-These are preliminary **internal observations** with hypothetical deployment impact; severity is not an independent auditor's rating. The examples are explicitly not deployment-ready. The public-disclosure fix must not be interpreted as repairing R-01 through R-05. No actual user funds are reported affected.
+These are preliminary **internal observations** with hypothetical deployment impact; severity is not an independent auditor's rating. The examples are explicitly not deployment-ready. The initial PR #19 disclosure fix did not change R-01 through R-05; the later hardening branch narrows their observed misuse but still cannot execute live asset settlement. No actual user funds are reported affected.
 
 ## 3. Independent review work requested
 
@@ -66,6 +94,6 @@ npx hardhat test test/ExternalAuditReproduction.test.js
 node --test scripts/check-public-disclosure.test.cjs
 ```
 
-`test/ExternalAuditReproduction.test.js` deliberately asserts **unsafe** outcomes; it is a *regression against hiding the limitations*, not a security-fix suite.
+At the PR #19 commit this file asserted unsafe outcomes; the subsequent hardening branch asserts those calls revert. Neither result grants production certification. Both should be kept for independent before/after reproduction.
 
 Internal investigation and test coverage are valuable inputs for an external audit, **not independent attestation**.

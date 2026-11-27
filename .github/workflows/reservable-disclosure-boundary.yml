@@ -3,8 +3,8 @@ name: Reservable conditional-profile disclosure regression
 on:
   pull_request:
     paths:
-      - "contracts/IERC8060Reservable.sol"
-      - "contracts/ERC8060ReservableMock.sol"
+      - "contracts/**"
+      - "test/**"
       - "docs/strict-vs-reservation-conditioned-discovery.md"
       - "docs/external-audit-scope-and-findings.md"
       - "docs/DEVELOPMENT_REPORT.md"

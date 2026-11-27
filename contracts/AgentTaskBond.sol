@@ -18,6 +18,7 @@ contract AgentTaskBond {
         address asset;
         uint256 amount;
         address agent;
+        address creator; // Test-only originator, not an escrow agent.
         bytes32 taskHash;
         bool active;
         bool settled;
@@ -63,6 +64,7 @@ contract AgentTaskBond {
             asset: asset,
             amount: amount,
             agent: agent,
+            creator: msg.sender,
             taskHash: taskHash,
             active: true,
             settled: false
@@ -83,6 +85,7 @@ contract AgentTaskBond {
 
         require(b.active, "bond not active");
         require(!b.settled, "bond already settled");
+        require(msg.sender == b.creator, "not bond creator");
 
         b.active = false;
 
@@ -92,19 +95,8 @@ contract AgentTaskBond {
     }
 
     function settleTaskBond(uint256 bondId) external {
-        Bond storage b = bonds[bondId];
-
-        require(b.active, "bond not active");
-        require(!b.settled, "bond already settled");
-
-        b.active = false;
-        b.settled = true;
-
-        // Demo only:
-        // IERC8060Reservable deliberately does not define settlement.
-        // A real application would connect this to external validation,
-        // payment execution, slashing, reputation, ERC-8004, ERC-8281, etc.
-
-        emit TaskBondSettled(bondId);
+        bondId;
+        // A flag with no verified task outcome and no real payment is not settlement.
+        revert("bond payout not implemented");
     }
 }
