@@ -77,15 +77,15 @@ Applications SHOULD clearly disclose:
 
 ### Timed Escrow
 
-Funds become releasable after a predefined deadline.
+A recorded reservation may become releasable after a predefined deadline; this does not refund ETH.
 
 ### Arbitration Recovery
 
-An arbitrator can release reserved value after dispute resolution.
+An arbitrator may be permitted by a separately reviewed implementation to release the accounting lock after a dispute; no payment is implied.
 
 ### Governance Recovery
 
-A governance process can authorize release after inactivity.
+A governance process might authorize an accounting release, subject to separately verified permissions; this does not execute a payout.
 
 ## Non-Goals
 
