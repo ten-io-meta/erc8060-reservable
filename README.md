@@ -275,7 +275,7 @@ Current test suite validates:
 * Expired escrow recovery
 * Recovery without modifying IERC8060Reservable
 
-**Current repository status: 61 passing tests.**
+**Historical baseline:** earlier published evidence reported 61 passing tests. This is not an exact-head claim for the newer stacked research PRs; consult each branch's CI logs before asserting its current test count.
 
 ---
 
